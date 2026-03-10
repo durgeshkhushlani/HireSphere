@@ -1,105 +1,78 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import API from '../../services/api';
 
 const ViewApplications = () => {
   const { companyId } = useParams();
+  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
-  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchApps = async () => {
       try {
-        const [appsRes, companyRes] = await Promise.all([
-          API.get(`/applications/company/${companyId}`),
-          API.get(`/companies/${companyId}`),
-        ]);
-        setApplications(appsRes.data);
-        setCompany(companyRes.data);
-      } catch (error) {
-        console.error('Failed to fetch applications:', error);
-      } finally {
-        setLoading(false);
-      }
+        const { data } = await API.get(`/applications/company/${companyId}`);
+        setApplications(data);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
     };
-    fetchData();
+    fetchApps();
   }, [companyId]);
 
-  const handleDownloadAll = async () => {
+  const downloadAll = async () => {
     try {
-      const response = await API.get(`/applications/company/${companyId}/download`, {
-        responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${company?.name || 'company'}_resumes.zip`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const res = await API.get(`/applications/download/${companyId}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a'); a.href = url;
+      a.download = `resumes-${companyId}.zip`; a.click();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download failed:', error);
-      alert('Failed to download resumes');
-    }
+    } catch (err) { console.error(err); }
   };
 
-  if (loading) {
-    return <div className="loading-screen"><div className="spinner"></div></div>;
-  }
+  if (loading) return <div className="loading-screen"><div className="spinner"></div></div>;
 
   return (
     <div className="dashboard-page">
-      <div className="dashboard-header">
-        <div>
-          <h1>{company?.name}</h1>
-          <p className="text-muted">{company?.role} — {applications.length} application(s)</p>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+        <button className="btn btn-ghost" onClick={() => navigate(-1)}>← Back</button>
         {applications.length > 0 && (
-          <button className="btn btn-primary" onClick={handleDownloadAll}>
-            📥 Download All Resumes (ZIP)
-          </button>
+          <button className="btn btn-primary" onClick={downloadAll}>📥 Download All Resumes</button>
         )}
       </div>
 
+      <h1 style={{ marginBottom: '1.5rem' }}>Applications ({applications.length})</h1>
+
       {applications.length === 0 ? (
-        <div className="empty-state">
-          <p>No applications received yet.</p>
-        </div>
+        <div className="empty-state"><p>No applications received yet.</p></div>
       ) : (
         <div className="applications-list">
-          {applications.map((app, index) => (
+          {applications.map((app) => (
             <div key={app._id} className="application-card">
               <div className="application-header">
-                <h3>#{index + 1} — {app.studentId?.name || 'Unknown'}</h3>
-                <span className="text-muted">{app.studentId?.email}</span>
+                <h3>{app.studentId?.name || 'Student'}</h3>
+                <span className="text-muted" style={{ fontSize: '0.82rem' }}>
+                  {app.studentId?.email} • Submitted {new Date(app.createdAt).toLocaleDateString()}
+                </span>
               </div>
 
-              {app.answers && app.answers.length > 0 && (
+              {app.answers?.length > 0 && (
                 <div className="application-answers">
-                  <h4>Form Responses</h4>
-                  {app.answers.map((ans, i) => (
+                  <h4>Responses</h4>
+                  {app.answers.map((a, i) => (
                     <div key={i} className="answer-item">
-                      <p className="answer-question"><strong>Q:</strong> {ans.question}</p>
-                      <p className="answer-text"><strong>A:</strong> {ans.answer}</p>
+                      <p className="answer-question">{a.question}</p>
+                      <p className="answer-text">{a.answer}</p>
                     </div>
                   ))}
                 </div>
               )}
 
               <div className="application-footer">
-                <a
-                  href={`http://localhost:3000/uploads/resumes/${app.resume}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-outline btn-small"
-                >
-                  📄 View Resume
-                </a>
-                <span className="text-muted">
-                  Applied: {new Date(app.createdAt).toLocaleString()}
-                </span>
+                {app.resume && (
+                  <a href={`http://localhost:3000/uploads/resumes/${app.resume}`} target="_blank" rel="noreferrer" className="btn btn-outline btn-small">
+                    View Resume ↗
+                  </a>
+                )}
               </div>
             </div>
           ))}

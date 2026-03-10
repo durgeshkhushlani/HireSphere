@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -11,6 +12,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import CreateCompany from './pages/admin/CreateCompany';
 import ViewApplications from './pages/admin/ViewApplications';
 import AdminProfile from './pages/admin/AdminProfile';
+import AdminCompanyDetails from './pages/admin/AdminCompanyDetails';
 import StudentSignup from './pages/student/StudentSignup';
 import StudentLogin from './pages/student/StudentLogin';
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -36,6 +38,7 @@ const AppRoutes = () => {
       {/* Admin */}
       <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/create-company" element={<ProtectedRoute role="admin"><CreateCompany /></ProtectedRoute>} />
+      <Route path="/admin/company/:companyId" element={<ProtectedRoute role="admin"><AdminCompanyDetails /></ProtectedRoute>} />
       <Route path="/admin/applications/:companyId" element={<ProtectedRoute role="admin"><ViewApplications /></ProtectedRoute>} />
       <Route path="/admin/profile" element={<ProtectedRoute role="admin"><AdminProfile /></ProtectedRoute>} />
 
@@ -52,12 +55,14 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Navbar />
-        <AppRoutes />
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Navbar />
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

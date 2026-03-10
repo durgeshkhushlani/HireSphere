@@ -1,83 +1,62 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../services/api';
 
 const AdminProfile = () => {
   const { user, login } = useAuth();
-  const [formData, setFormData] = useState({ name: '', universityName: '' });
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({ name: user.name || '', universityName: user.universityName || '' });
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
-  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data } = await API.get('/admin/profile');
-        setFormData({ name: data.name, universityName: data.universityName });
-      } catch (error) {
-        console.error('Failed to fetch profile:', error);
-      }
-    };
-    fetchProfile();
-  }, []);
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setSuccess('');
+    setSaving(true); setSuccess('');
     try {
       const { data } = await API.put('/admin/profile', formData);
-      login({ ...user, name: data.name, universityName: data.universityName }, JSON.parse(localStorage.getItem('hiresphere_user')).token);
-      setSuccess('Profile updated successfully!');
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(user.universityCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+      login({ ...user, ...data }, localStorage.getItem('hiresphere_token'));
+      setSuccess('✓ Profile updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) { console.error(err); }
+    finally { setSaving(false); }
   };
 
   return (
     <div className="form-page">
       <div className="form-card">
-        <h2>Admin Profile</h2>
-        <p className="text-muted">Manage your account details</p>
+        <h2>Profile</h2>
 
-        <div className="code-card" style={{ marginBottom: '1.5rem' }}>
+        <div className="code-card" style={{ marginTop: '1.5rem' }}>
           <div className="code-card-inner">
             <div>
               <h4>University Secret Code</h4>
+              <p className="text-muted" style={{ fontSize: '0.82rem' }}>Share with students</p>
             </div>
             <div className="code-display">
               <span className="code-text">{user.universityCode}</span>
-              <button className="btn btn-outline btn-small" onClick={copyCode}>
-                {copied ? '✓ Copied!' : 'Copy'}
-              </button>
+              <button className="btn btn-outline btn-small" onClick={() => navigator.clipboard.writeText(user.universityCode)}>Copy</button>
             </div>
           </div>
         </div>
 
         {success && <div className="alert alert-success">{success}</div>}
-        <form onSubmit={handleSubmit}>
+
+        <form onSubmit={handleSubmit} style={{ marginTop: '1.5rem' }}>
           <div className="form-group">
-            <label>Name</label>
-            <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+            <label>Full Name</label>
+            <input type="text" name="name" value={formData.name} onChange={handleChange} required />
           </div>
           <div className="form-group">
             <label>University Name</label>
-            <input type="text" value={formData.universityName} onChange={(e) => setFormData({ ...formData, universityName: e.target.value })} required />
+            <input type="text" name="universityName" value={formData.universityName} onChange={handleChange} required />
           </div>
           <div className="form-group">
             <label>Email</label>
-            <input type="email" value={user.email} disabled className="input-disabled" />
+            <input type="email" value={user.email} disabled />
           </div>
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Saving...' : 'Update Profile'}
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? 'Saving...' : '💾 Save Changes'}
           </button>
         </form>
       </div>

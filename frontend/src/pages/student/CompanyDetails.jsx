@@ -17,73 +17,55 @@ const CompanyDetails = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data: companyData } = await API.get(`/companies/${companyId}`);
-        setCompany(companyData);
-        setAnswers(
-          (companyData.formQuestions || []).map((q) => ({ question: q, answer: '' }))
-        );
-
-        // Check if already applied
+        const { data } = await API.get(`/companies/${companyId}`);
+        setCompany(data);
+        setAnswers((data.formQuestions || []).map(q => ({ question: q, answer: '' })));
         const { data: myApps } = await API.get('/applications/student');
-        const applied = myApps.some(
-          (a) => (a.companyId?._id || a.companyId) === companyId
-        );
-        setAlreadyApplied(applied);
-      } catch (error) {
-        console.error('Failed to fetch company:', error);
-      } finally {
-        setLoading(false);
-      }
+        setAlreadyApplied(myApps.some(a => (a.companyId?._id || a.companyId) === companyId));
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
     };
     fetchData();
   }, [companyId]);
 
-  const handleAnswerChange = (index, value) => {
-    const updated = [...answers];
-    updated[index].answer = value;
-    setAnswers(updated);
-  };
+  const handleAnswerChange = (i, v) => { const u = [...answers]; u[i].answer = v; setAnswers(u); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSubmitting(true);
-
+    setError(''); setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('companyId', companyId);
-      formData.append('answers', JSON.stringify(answers));
-      if (resume) {
-        formData.append('resume', resume);
-      }
-
-      await API.post('/applications', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
+      const fd = new FormData();
+      fd.append('companyId', companyId);
+      fd.append('answers', JSON.stringify(answers));
+      if (resume) fd.append('resume', resume);
+      await API.post('/applications', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       setSuccess('Application submitted successfully!');
       setAlreadyApplied(true);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit application');
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || 'Failed to submit'); }
+    finally { setSubmitting(false); }
   };
 
-  if (loading) {
-    return <div className="loading-screen"><div className="spinner"></div></div>;
-  }
+  if (loading) return <div className="loading-screen"><div className="spinner"></div></div>;
+  if (!company) return <div className="dashboard-page"><p className="text-muted">Company not found.</p></div>;
 
-  if (!company) {
-    return <div className="dashboard-page"><p>Company not found.</p></div>;
-  }
+  const isExpired = company.lastDate && new Date(company.lastDate) < new Date();
+  const formattedDeadline = company.lastDate
+    ? new Date(company.lastDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
 
   return (
     <div className="form-page">
       <div className="form-card large-card">
+        <button className="btn btn-ghost" onClick={() => navigate(-1)} style={{ marginBottom: '1rem' }}>← Back</button>
+
         <div className="company-detail-header">
           <h2>{company.name}</h2>
-          <p className="company-role">{company.role}</p>
+          <span className="detail-role">{company.role}</span>
+          {formattedDeadline && (
+            <p className={`deadline-info ${isExpired ? 'expired-text' : ''}`}>
+              {isExpired ? '❌ Application period ended' : `📅 Apply by: ${formattedDeadline}`}
+            </p>
+          )}
         </div>
 
         <div className="company-description">
@@ -92,53 +74,34 @@ const CompanyDetails = () => {
         </div>
 
         {alreadyApplied ? (
-          <div className="alert alert-success">
-            ✅ You have already applied to this company. Good luck!
-          </div>
+          <div className="alert alert-success">✅ You have already applied to this company. Good luck!</div>
+        ) : isExpired ? (
+          <div className="alert alert-error">❌ The application deadline for this company has passed.</div>
         ) : (
           <>
             <hr className="divider" />
-            <h3>Apply Now</h3>
+            <h3 style={{ marginBottom: '1rem' }}>Apply Now</h3>
             {error && <div className="alert alert-error">{error}</div>}
             {success && <div className="alert alert-success">{success}</div>}
 
             <form onSubmit={handleSubmit}>
-              {answers.map((item, index) => (
-                <div key={index} className="form-group">
+              {answers.map((item, i) => (
+                <div key={i} className="form-group">
                   <label>{item.question}</label>
-                  <textarea
-                    value={item.answer}
-                    onChange={(e) => handleAnswerChange(index, e.target.value)}
-                    required
-                    rows={3}
-                    placeholder="Your answer..."
-                  />
+                  <textarea value={item.answer} onChange={(e) => handleAnswerChange(i, e.target.value)} required rows={3} placeholder="Your answer..." />
                 </div>
               ))}
-
               <div className="form-group">
-                <label>Upload Resume (PDF, DOC, DOCX — Max 5MB)</label>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => setResume(e.target.files[0])}
-                  className="file-input"
-                />
-                <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>
-                  If not uploaded here, your profile resume will be used.
-                </p>
+                <label>Resume (PDF, DOC, DOCX — Max 5MB)</label>
+                <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setResume(e.target.files[0])} className="file-input" />
+                <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.3rem' }}>If not uploaded, your profile resume will be used.</p>
               </div>
-
               <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
                 {submitting ? 'Submitting...' : 'Submit Application'}
               </button>
             </form>
           </>
         )}
-
-        <button className="btn btn-outline" style={{ marginTop: '1rem' }} onClick={() => navigate(-1)}>
-          ← Back
-        </button>
       </div>
     </div>
   );

@@ -4,40 +4,29 @@ import { useAuth } from '../../context/AuthContext';
 import API from '../../services/api';
 
 const AdminSignup = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    universityName: '',
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ name: '', universityName: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
       const { data } = await API.post('/auth/admin/signup', formData);
       login(data.user, data.token);
       navigate('/admin/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Signup failed');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || 'Signup failed'); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h2><span className="brand-icon">◆</span> Admin Signup</h2>
+        <h2>Admin Signup</h2>
         <p className="auth-subtitle">Register your university placement cell</p>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -61,9 +50,7 @@ const AdminSignup = () => {
             {loading ? 'Creating Account...' : 'Create Admin Account'}
           </button>
         </form>
-        <p className="auth-footer">
-          Already have an account? <Link to="/admin/login">Login here</Link>
-        </p>
+        <p className="auth-footer">Already have an account? <Link to="/admin/login">Login here</Link></p>
       </div>
     </div>
   );

@@ -4,40 +4,29 @@ import { useAuth } from '../../context/AuthContext';
 import API from '../../services/api';
 
 const StudentSignup = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    universityCode: '',
-  });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', universityCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
       const { data } = await API.post('/auth/student/signup', formData);
       login(data.user, data.token);
       navigate('/student/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Signup failed');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || 'Signup failed'); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h2><span className="brand-icon">◆</span> Student Signup</h2>
+        <h2>Student Signup</h2>
         <p className="auth-subtitle">Join your university's placement pool</p>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -55,15 +44,13 @@ const StudentSignup = () => {
           </div>
           <div className="form-group">
             <label>University Secret Code</label>
-            <input type="text" name="universityCode" value={formData.universityCode} onChange={handleChange} required placeholder="Enter code from your placement cell" className="code-input" />
+            <input type="text" name="universityCode" value={formData.universityCode} onChange={handleChange} required placeholder="Code from your placement cell" style={{ letterSpacing: '3px', textTransform: 'uppercase', fontWeight: 600 }} />
           </div>
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? 'Creating Account...' : 'Join Placement Pool'}
           </button>
         </form>
-        <p className="auth-footer">
-          Already registered? <Link to="/student/login">Login here</Link>
-        </p>
+        <p className="auth-footer">Already registered? <Link to="/student/login">Login here</Link></p>
       </div>
     </div>
   );

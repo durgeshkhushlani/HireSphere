@@ -15,6 +15,10 @@ const companySchema = new mongoose.Schema({
     type: String,
     required: [true, 'Description is required'],
   },
+  lastDate: {
+    type: Date,
+    required: [true, 'Last date to apply is required'],
+  },
   formQuestions: [{
     type: String,
   }],

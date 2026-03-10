@@ -1,105 +1,64 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../services/api';
 
 const StudentProfile = () => {
   const { user, login } = useAuth();
-  const [name, setName] = useState('');
+  const [formData, setFormData] = useState({ name: user.name || '' });
   const [resume, setResume] = useState(null);
-  const [currentResume, setCurrentResume] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
+  const currentResume = user.resume;
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data } = await API.get('/student/profile');
-        setName(data.name);
-        setCurrentResume(data.resume || '');
-      } catch (error) {
-        console.error('Failed to fetch profile:', error);
-      }
-    };
-    fetchProfile();
-  }, []);
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setSuccess('');
+    setSaving(true); setSuccess('');
     try {
-      const formData = new FormData();
-      formData.append('name', name);
-      if (resume) {
-        formData.append('resume', resume);
-      }
-
-      const { data } = await API.put('/student/profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      login(
-        { ...user, name: data.name },
-        JSON.parse(localStorage.getItem('hiresphere_user')).token
-      );
-      setCurrentResume(data.resume || '');
-      setSuccess('Profile updated successfully!');
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-    } finally {
-      setLoading(false);
-    }
+      const fd = new FormData();
+      fd.append('name', formData.name);
+      if (resume) fd.append('resume', resume);
+      const { data } = await API.put('/student/profile', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      login({ ...user, ...data }, localStorage.getItem('hiresphere_token'));
+      setSuccess('✓ Profile updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) { console.error(err); }
+    finally { setSaving(false); }
   };
 
   return (
     <div className="form-page">
       <div className="form-card">
-        <h2>Student Profile</h2>
-        <p className="text-muted">Manage your account and resume</p>
+        <h2>Profile</h2>
 
-        {success && <div className="alert alert-success">{success}</div>}
+        {success && <div className="alert alert-success" style={{ marginTop: '1rem' }}>{success}</div>}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ marginTop: '1.5rem' }}>
           <div className="form-group">
-            <label>Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+            <label>Full Name</label>
+            <input type="text" name="name" value={formData.name} onChange={handleChange} required />
           </div>
           <div className="form-group">
             <label>Email</label>
-            <input type="email" value={user.email} disabled className="input-disabled" />
-          </div>
-          <div className="form-group">
-            <label>University Code</label>
-            <input type="text" value={user.universityCode} disabled className="input-disabled" />
+            <input type="email" value={user.email} disabled />
           </div>
 
+          {currentResume && (
+            <div className="current-resume">
+              <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                Current Resume: <a href={`http://localhost:3000/uploads/resumes/${currentResume}`} target="_blank" rel="noreferrer" className="link">View ↗</a>
+              </p>
+            </div>
+          )}
+
           <div className="form-group">
-            <label>Resume</label>
-            {currentResume && (
-              <div className="current-resume">
-                <a
-                  href={`http://localhost:3000/uploads/resumes/${currentResume}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="link"
-                >
-                  📄 View Current Resume
-                </a>
-              </div>
-            )}
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) => setResume(e.target.files[0])}
-              className="file-input"
-            />
-            <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>
-              Upload a new resume to replace the current one.
-            </p>
+            <label>{currentResume ? 'Update Resume' : 'Upload Resume'}</label>
+            <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setResume(e.target.files[0])} className="file-input" />
           </div>
 
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Saving...' : 'Update Profile'}
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? 'Saving...' : '💾 Save Changes'}
           </button>
         </form>
       </div>

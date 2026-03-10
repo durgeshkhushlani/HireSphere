@@ -10,29 +10,23 @@ const AdminLogin = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
       const { data } = await API.post('/auth/admin/login', formData);
       login(data.user, data.token);
       navigate('/admin/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || 'Login failed'); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h2><span className="brand-icon">◆</span> Admin Login</h2>
+        <h2>Admin Login</h2>
         <p className="auth-subtitle">Sign in to your placement cell dashboard</p>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
@@ -48,12 +42,8 @@ const AdminLogin = () => {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-        <p className="auth-footer">
-          Don't have an account? <Link to="/admin/signup">Register here</Link>
-        </p>
-        <p className="auth-footer">
-          <Link to="/">← Back to Home</Link>
-        </p>
+        <p className="auth-footer">Don't have an account? <Link to="/admin/signup">Register here</Link></p>
+        <p className="auth-footer"><Link to="/">← Back to Home</Link></p>
       </div>
     </div>
   );
