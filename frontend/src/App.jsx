@@ -3,9 +3,11 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 
 // Pages
 import LandingPage from './pages/LandingPage';
+import NotFound from './pages/NotFound';
 import AdminSignup from './pages/admin/AdminSignup';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -48,7 +50,7 @@ const AppRoutes = () => {
       <Route path="/student/profile" element={<ProtectedRoute role="student"><StudentProfile /></ProtectedRoute>} />
 
       {/* Catch all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
@@ -58,6 +60,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
+          <ScrollToTop />
           <Navbar />
           <AppRoutes />
         </Router>

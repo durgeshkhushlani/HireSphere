@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import Typewriter from 'typewriter-effect';
 
 const LandingPage = () => {
   const { theme, toggleTheme } = useTheme();
@@ -25,7 +26,31 @@ const LandingPage = () => {
         <h1 className="landing-title">
           campus<br />
           placements,<br />
-          <span className="gradient-text">simplified.</span>
+          <span className="typewriter-wrapper">
+            <Typewriter
+              onInit={(typewriter) => {
+                typewriter
+                  .typeString('<span style="color: var(--text-2)">chaotic...</span>')
+                  .pauseFor(1200)
+                  .deleteAll(30)
+                  .typeString('<span style="color: var(--text-2)">spreadsheets...</span>')
+                  .pauseFor(1200)
+                  .deleteAll(30)
+                  .typeString('<span style="color: var(--text-2)">stressful...</span>')
+                  .pauseFor(1200)
+                  .deleteAll(30)
+                  .typeString('<span class="gradient-text">simplified.</span>')
+                  .start();
+              }}
+              options={{
+                delay: 65,
+                deleteSpeed: 35,
+                cursor: '|',
+                wrapperClassName: 'typewriter-text',
+                cursorClassName: 'typewriter-cursor',
+              }}
+            />
+          </span>
         </h1>
         <p className="landing-desc">
           One platform for admins to manage company drives and students to discover, apply, and track — effortlessly.
@@ -53,6 +78,15 @@ const LandingPage = () => {
           </div>
         </div>
       </div>
+
+      <footer className="landing-footer" style={{ textAlign: 'center', marginTop: '4rem', paddingBottom: '2rem', color: 'var(--text-3)', fontSize: '0.9rem', zIndex: 1, position: 'relative', width: '100%' }}>
+        <p>made with ❤️</p>
+        <p>Author: Durgesh Khushlani</p>
+        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <a href="https://github.com/durgeshkhushlani" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: '500' }}>GitHub</a>
+          <a href="https://www.linkedin.com/in/durgesh-khushlani-912366324/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: '500' }}>LinkedIn</a>
+        </div>
+      </footer>
     </div>
   );
 };
