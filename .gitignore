@@ -1,0 +1,4 @@
+docker-compose.yml
+hiresphere-implementation-plan.md
+node_modules/
+.env
