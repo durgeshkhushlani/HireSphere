@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+
+  @@map("role")
+}
+
+enum DriveStatus {
+  DRAFT
+  OPEN
+  CLOSED
+
+  @@map("drive_status")
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  OA_TEST
+  INTERVIEW
+  SELECTED
+  NOT_SELECTED
+
+  @@map("application_status")
+}
+
+model University {
+  id       String  @id @default(uuid())
+  name     String
+  domain   String  @unique
+  verified Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  universityPrograms UniversityProgram[]
+  drives             Drive[]
+  placements         Placement[]
+
+  @@map("universities")
+}
+
+model Program {
+  id   String @id @default(uuid())
+  name String @unique
+
+  universityPrograms UniversityProgram[]
+  studentProfiles    StudentProfile[]
+
+  @@map("programs")
+}
+
+model UniversityProgram {
+  id           String @id @default(uuid())
+  universityId String @map("university_id")
+  programId    String @map("program_id")
+
+  university University @relation(fields: [universityId], references: [id])
+  program    Program    @relation(fields: [programId], references: [id])
+
+  driveEligiblePrograms DriveEligibleProgram[]
+
+  @@unique([universityId, programId])
+  @@map("university_programs")
+}
+
+model User {
+  id           String @id @default(uuid())
+  universityId String @map("university_id")
+  role         Role
+  email        String @unique
+  passwordHash String @map("password_hash")
+  name         String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  university     University      @relation(fields: [universityId], references: [id])
+  studentProfile StudentProfile?
+  placements     Placement[]
+
+  @@map("users")
+}
+
+model StudentProfile {
+  userId          String  @id @map("user_id")
+  programId       String  @map("program_id")
+  cgpa            Decimal @db.Decimal(4, 2)
+  backlogCount    Int     @default(0) @map("backlog_count")
+  placementLocked Boolean @default(false) @map("placement_locked")
+
+  user         User          @relation(fields: [userId], references: [id])
+  program      Program       @relation(fields: [programId], references: [id])
+  applications Application[]
+
+  @@map("student_profiles")
+}
+
+model Company {
+  id           String  @id @default(uuid())
+  name         String
+  industry     String?
+  contactEmail String? @map("contact_email")
+  contactPhone String? @map("contact_phone")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  drives     Drive[]
+  placements Placement[]
+
+  @@map("companies")
+}
+
+model Drive {
+  id           String      @id @default(uuid())
+  universityId String      @map("university_id")
+  companyId    String      @map("company_id")
+  title        String
+  description  String?
+  status       DriveStatus @default(DRAFT)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  university       University              @relation(fields: [universityId], references: [id])
+  company          Company                 @relation(fields: [companyId], references: [id])
+  eligiblePrograms DriveEligibleProgram[]
+  applicationForm  ApplicationForm?
+  applications     Application[]
+  placements       Placement[]
+
+  @@map("drives")
+}
+
+model DriveEligibleProgram {
+  id                  String @id @default(uuid())
+  driveId             String @map("drive_id")
+  universityProgramId String @map("university_program_id")
+
+  drive             Drive             @relation(fields: [driveId], references: [id])
+  universityProgram UniversityProgram @relation(fields: [universityProgramId], references: [id])
+
+  @@unique([driveId, universityProgramId])
+  @@map("drive_eligible_programs")
+}
+
+model ApplicationForm {
+  id        String @id @default(uuid())
+  driveId   String @unique @map("drive_id")
+  questions Json
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  drive Drive @relation(fields: [driveId], references: [id])
+
+  @@map("application_forms")
+}
+
+model Application {
+  id               String            @id @default(uuid())
+  driveId          String            @map("drive_id")
+  studentProfileId String            @map("student_profile_id")
+  responses        Json
+  resumeUrl        String?           @map("resume_url")
+  interviewSlot    DateTime?         @map("interview_slot")
+  interviewVenue   String?           @map("interview_venue")
+  status           ApplicationStatus @default(APPLIED)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  drive          Drive          @relation(fields: [driveId], references: [id])
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [userId])
+
+  @@unique([driveId, studentProfileId])
+  @@map("applications")
+}
+
+model Placement {
+  id            String   @id @default(uuid())
+  universityId  String   @map("university_id")
+  userId        String   @map("user_id")
+  companyId     String   @map("company_id")
+  driveId       String?  @map("drive_id")
+  packageAmount Decimal? @map("package_amount") @db.Decimal(10, 2)
+
+  placedAt DateTime @default(now()) @map("placed_at")
+
+  university University @relation(fields: [universityId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  company    Company    @relation(fields: [companyId], references: [id])
+  drive      Drive?     @relation(fields: [driveId], references: [id])
+
+  @@map("placements")
+}
