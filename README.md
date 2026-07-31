@@ -14,7 +14,7 @@ The [v1 prototype](legacy/) validated the core idea (admin-run drives, student a
 
 - **Backend:** Node.js, Express
 - **Database:** PostgreSQL + Prisma ORM
-- **Frontend:** Next.js (planned, after the backend and placement season)
+- **Frontend:** Next.js (planned for future phases)
 - **Tooling:** npm workspaces monorepo, Docker Compose for local Postgres
 
 ## Project structure
