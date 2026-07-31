@@ -1,4 +1,5 @@
 docker-compose.yml
 hiresphere-implementation-plan.md
+PROGRESS.md
 node_modules/
 .env
