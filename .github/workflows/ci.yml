@@ -16,7 +16,7 @@ jobs:
         env:
           POSTGRES_USER: hiresphere_user
           POSTGRES_PASSWORD: hiresphere_pass
-          POSTGRES_DB: hiresphere_ci
+          POSTGRES_DB: hiresphere_test
         ports:
           - 5432:5432
         options: >-
@@ -26,7 +26,10 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://hiresphere_user:hiresphere_pass@localhost:5432/hiresphere_ci
+      # The database name must contain "test" — tests/helpers/env.js refuses to
+      # run against anything else, since the suite truncates every table.
+      DATABASE_URL: postgresql://hiresphere_user:hiresphere_pass@localhost:5432/hiresphere_test
+      TEST_DATABASE_URL: postgresql://hiresphere_user:hiresphere_pass@localhost:5432/hiresphere_test
       JWT_SECRET: ci-test-secret
 
     steps:
@@ -57,3 +60,7 @@ jobs:
       - name: Smoke test — app module loads
         working-directory: apps/backend
         run: npx tsx scripts/smoke-test.js
+
+      - name: Run tests
+        working-directory: apps/backend
+        run: npm test
