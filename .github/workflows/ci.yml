@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hiresphere_user
+          POSTGRES_PASSWORD: hiresphere_pass
+          POSTGRES_DB: hiresphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://hiresphere_user:hiresphere_pass@localhost:5432/hiresphere_ci
+      JWT_SECRET: ci-test-secret
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        working-directory: apps/backend
+        run: npx prisma validate
+
+      - name: Apply migrations to a throwaway database
+        working-directory: apps/backend
+        run: npx prisma migrate deploy
+
+      - name: Smoke test — app module loads
+        working-directory: apps/backend
+        run: node -e "require('./src/app'); console.log('app loaded OK')"
