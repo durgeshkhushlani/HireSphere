@@ -8,6 +8,10 @@ const DRIVE_STATUSES = ['DRAFT', 'OPEN', 'CLOSED'];
 
 router.use(requireAuth);
 
+function getScopedDrive(driveId, universityId) {
+  return prisma.drive.findFirst({ where: { id: driveId, universityId } });
+}
+
 // Students and admins only ever see drives for their own university.
 router.get('/', async (req, res) => {
   const drives = await prisma.drive.findMany({
@@ -73,6 +77,95 @@ router.patch('/:id/status', requireRole('ADMIN'), async (req, res) => {
     data: { status },
   });
   res.json(drive);
+});
+
+// Application form: the per-drive question set a student fills out when applying.
+router.get('/:driveId/application-form', async (req, res) => {
+  const drive = await getScopedDrive(req.params.driveId, req.user.universityId);
+  if (!drive) {
+    return res.status(404).json({ error: 'Drive not found' });
+  }
+
+  const form = await prisma.applicationForm.findUnique({ where: { driveId: drive.id } });
+  if (!form) {
+    return res.status(404).json({ error: 'No application form set for this drive yet' });
+  }
+  res.json(form);
+});
+
+router.put('/:driveId/application-form', requireRole('ADMIN'), async (req, res) => {
+  const { questions } = req.body;
+
+  if (!Array.isArray(questions)) {
+    return res.status(400).json({ error: 'questions must be an array' });
+  }
+
+  const drive = await getScopedDrive(req.params.driveId, req.user.universityId);
+  if (!drive) {
+    return res.status(404).json({ error: 'Drive not found' });
+  }
+
+  const form = await prisma.applicationForm.upsert({
+    where: { driveId: drive.id },
+    update: { questions },
+    create: { driveId: drive.id, questions },
+  });
+  res.json(form);
+});
+
+// Applications: a student applying to a drive, and admins reviewing who applied.
+router.post('/:driveId/applications', requireRole('STUDENT'), async (req, res) => {
+  const { responses, resumeUrl } = req.body;
+
+  if (responses === undefined) {
+    return res.status(400).json({ error: 'responses is required' });
+  }
+
+  const drive = await getScopedDrive(req.params.driveId, req.user.universityId);
+  if (!drive) {
+    return res.status(404).json({ error: 'Drive not found' });
+  }
+  if (drive.status !== 'OPEN') {
+    return res.status(400).json({ error: 'This drive is not currently open for applications' });
+  }
+
+  try {
+    const application = await prisma.application.create({
+      data: {
+        driveId: drive.id,
+        studentProfileId: req.user.id,
+        responses,
+        resumeUrl,
+      },
+    });
+    res.status(201).json(application);
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'You have already applied to this drive' });
+    }
+    throw err;
+  }
+});
+
+router.get('/:driveId/applications', requireRole('ADMIN'), async (req, res) => {
+  const drive = await getScopedDrive(req.params.driveId, req.user.universityId);
+  if (!drive) {
+    return res.status(404).json({ error: 'Drive not found' });
+  }
+
+  const applications = await prisma.application.findMany({
+    where: { driveId: drive.id },
+    include: {
+      studentProfile: {
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          program: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(applications);
 });
 
 module.exports = router;
