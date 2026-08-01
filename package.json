@@ -6,5 +6,13 @@
   "workspaces": [
     "apps/*"
   ],
-  "license": "ISC"
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "ISC",
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "prisma@6.19.3": true
+  }
 }
