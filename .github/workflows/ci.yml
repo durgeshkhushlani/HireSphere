@@ -56,4 +56,4 @@ jobs:
 
       - name: Smoke test — app module loads
         working-directory: apps/backend
-        run: node -e "require('./src/app'); console.log('app loaded OK')"
+        run: npx tsx scripts/smoke-test.js
