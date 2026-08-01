@@ -28,14 +28,24 @@ async function getForUniversity(driveId, universityId) {
   return drive;
 }
 
-async function create({ companyId, title, description }, universityId) {
+async function create({ companyId, title, description, minCgpa, maxBacklogs }, universityId) {
   if (!companyId || !title) {
     throw ApiError.badRequest('companyId and title are required');
+  }
+  if (maxBacklogs !== undefined && maxBacklogs !== null && maxBacklogs < 0) {
+    throw ApiError.badRequest('maxBacklogs cannot be negative');
   }
 
   try {
     return await prisma.drive.create({
-      data: { companyId, title, description, universityId },
+      data: {
+        companyId,
+        title,
+        description,
+        universityId,
+        ...(minCgpa !== undefined && { minCgpa }),
+        ...(maxBacklogs !== undefined && { maxBacklogs }),
+      },
     });
   } catch (err) {
     if (err.code === 'P2003') throw ApiError.badRequest('companyId does not exist');

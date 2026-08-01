@@ -20,6 +20,30 @@ const APPLICANT_INCLUDE = {
   },
 };
 
+// Plan §4: eligibility is checked automatically against the student's stored
+// profile. A null criterion on the drive means "no restriction on that dimension".
+async function assertEligible(drive, studentProfileId) {
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId: studentProfileId },
+  });
+  if (!profile) {
+    throw ApiError.notFound('Student profile not found');
+  }
+
+  // Global placement lock: once selected anywhere, no further applications.
+  if (profile.placementLocked) {
+    throw ApiError.forbidden('You are already placed and cannot apply to further drives');
+  }
+
+  if (drive.minCgpa != null && Number(profile.cgpa) < Number(drive.minCgpa)) {
+    throw ApiError.forbidden(`This drive requires a minimum CGPA of ${drive.minCgpa}`);
+  }
+
+  if (drive.maxBacklogs != null && profile.backlogCount > drive.maxBacklogs) {
+    throw ApiError.forbidden(`This drive allows at most ${drive.maxBacklogs} backlog(s)`);
+  }
+}
+
 async function applyToDrive({ driveId, universityId, studentProfileId, responses, resumeUrl }) {
   if (responses === undefined) {
     throw ApiError.badRequest('responses is required');
@@ -29,6 +53,8 @@ async function applyToDrive({ driveId, universityId, studentProfileId, responses
   if (drive.status !== 'OPEN') {
     throw ApiError.badRequest('This drive is not currently open for applications');
   }
+
+  await assertEligible(drive, studentProfileId);
 
   try {
     return await prisma.application.create({
@@ -79,7 +105,11 @@ async function getForUser(id, user) {
   return application;
 }
 
-async function updateStatus(id, universityId, { status, interviewSlot, interviewVenue }) {
+async function updateStatus(
+  id,
+  universityId,
+  { status, interviewSlot, interviewVenue, packageAmount }
+) {
   if (!APPLICATION_STATUSES.includes(status)) {
     throw ApiError.badRequest(`status must be one of: ${APPLICATION_STATUSES.join(', ')}`);
   }
@@ -92,13 +122,49 @@ async function updateStatus(id, universityId, { status, interviewSlot, interview
     throw ApiError.notFound('Application not found');
   }
 
-  return prisma.application.update({
-    where: { id },
-    data: {
-      status,
-      ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
-      ...(interviewVenue !== undefined && { interviewVenue }),
-    },
+  const wasSelected = application.status === 'SELECTED';
+  const nowSelected = status === 'SELECTED';
+
+  // Status change, placement record and placement lock must move together —
+  // a partial write here would either lock a student with no placement on
+  // record, or record a placement without locking them.
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.application.update({
+      where: { id },
+      data: {
+        status,
+        ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
+        ...(interviewVenue !== undefined && { interviewVenue }),
+      },
+    });
+
+    if (nowSelected && !wasSelected) {
+      await tx.placement.create({
+        data: {
+          universityId: application.drive.universityId,
+          userId: application.studentProfileId,
+          companyId: application.drive.companyId,
+          driveId: application.drive.id,
+          ...(packageAmount !== undefined && { packageAmount }),
+        },
+      });
+      await tx.studentProfile.update({
+        where: { userId: application.studentProfileId },
+        data: { placementLocked: true },
+      });
+    } else if (wasSelected && !nowSelected) {
+      // Admin undoing a selection. Without this the student would stay
+      // permanently locked out of every future drive.
+      await tx.placement.deleteMany({
+        where: { driveId: application.driveId, userId: application.studentProfileId },
+      });
+      await tx.studentProfile.update({
+        where: { userId: application.studentProfileId },
+        data: { placementLocked: false },
+      });
+    }
+
+    return updated;
   });
 }
 

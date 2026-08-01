@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Quick regression check against a locally running HireSphere backend.
 # Usage: start the server first (npm run dev), then run this script.
+#
+# Deliberately read-only — it creates no drives/applications, so it's safe to
+# run repeatedly without leaving junk in the dev database. Business rules that
+# need fixtures (eligibility thresholds, placement lock) aren't covered here.
 set -uo pipefail
 
 PORT="${PORT:-3001}"
@@ -46,6 +50,11 @@ check "GET /api/drives (scoped list)" "$(curl -s -o /dev/null -w '%{http_code}' 
 
 check "GET /api/applications/me (student)" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/applications/me" -H "Authorization: Bearer $STUDENT_TOKEN")" "200"
 check "GET /api/applications/me (admin forbidden)" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/applications/me" -H "Authorization: Bearer $ADMIN_TOKEN")" "403"
+
+check "GET /api/placements (admin)" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/placements" -H "Authorization: Bearer $ADMIN_TOKEN")" "200"
+check "GET /api/placements (student forbidden)" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/placements" -H "Authorization: Bearer $STUDENT_TOKEN")" "403"
+check "GET /api/placements/me (student)" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/placements/me" -H "Authorization: Bearer $STUDENT_TOKEN")" "200"
+check "GET /api/placements/me (admin forbidden)" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/placements/me" -H "Authorization: Bearer $ADMIN_TOKEN")" "403"
 
 echo "== $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

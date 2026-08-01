@@ -130,6 +130,10 @@ model Drive {
   description  String?
   status       DriveStatus @default(DRAFT)
 
+  // Eligibility criteria — null means "no restriction on this dimension".
+  minCgpa     Decimal? @map("min_cgpa") @db.Decimal(4, 2)
+  maxBacklogs Int?     @map("max_backlogs")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
