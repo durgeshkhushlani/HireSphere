@@ -7,23 +7,28 @@ import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { listDrives, type Drive } from "@/lib/api/drives";
 import { listMyApplications, type Application } from "@/lib/api/applications";
+import { listMyPlacements, type MyPlacement } from "@/lib/api/placements";
 import { DriveBrowser } from "./drive-browser";
 import { MyApplications } from "./my-applications";
+import { PlacementBanner } from "./placement-banner";
 
 export function StudentDashboard() {
   const { token } = useAuth();
   const [drives, setDrives] = useState<Drive[] | null>(null);
   const [applications, setApplications] = useState<Application[] | null>(null);
+  const [placements, setPlacements] = useState<MyPlacement[]>([]);
 
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [driveList, applicationList] = await Promise.all([
+      const [driveList, applicationList, placementList] = await Promise.all([
         listDrives(token),
         listMyApplications(token),
+        listMyPlacements(token),
       ]);
       setDrives(driveList);
       setApplications(applicationList);
+      setPlacements(placementList);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't load your dashboard");
     }
@@ -37,6 +42,8 @@ export function StudentDashboard() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 sm:px-8">
+      {placements.length > 0 && <PlacementBanner placement={placements[0]} />}
+
       <h1 className="font-heading text-2xl font-extrabold">Drives</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Browse open drives at your university and track every application you submit.
