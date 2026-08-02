@@ -19,3 +19,11 @@ export function createCompany(
 ) {
   return apiFetch<Company>("/companies", { method: "POST", body: input, token });
 }
+
+export function updateCompany(
+  id: string,
+  input: { name?: string; industry?: string; contactEmail?: string; contactPhone?: string },
+  token: string
+) {
+  return apiFetch<Company>(`/companies/${id}`, { method: "PATCH", body: input, token });
+}

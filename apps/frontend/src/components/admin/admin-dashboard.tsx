@@ -5,6 +5,7 @@ import { DriveManager } from "./drive-manager";
 import { ApplicantsPanel } from "./applicants-panel";
 import { PlacementsOverview } from "./placements-overview";
 import { ProgramsManager } from "./programs-manager";
+import { CompaniesManager } from "./companies-manager";
 
 export function AdminDashboard() {
   return (
@@ -20,6 +21,7 @@ export function AdminDashboard() {
           <TabsTrigger value="applicants">Applicants</TabsTrigger>
           <TabsTrigger value="placements">Placements</TabsTrigger>
           <TabsTrigger value="programs">Programs</TabsTrigger>
+          <TabsTrigger value="companies">Companies</TabsTrigger>
         </TabsList>
         <TabsContent value="drives" className="mt-6">
           <DriveManager />
@@ -32,6 +34,9 @@ export function AdminDashboard() {
         </TabsContent>
         <TabsContent value="programs" className="mt-6">
           <ProgramsManager />
+        </TabsContent>
+        <TabsContent value="companies" className="mt-6">
+          <CompaniesManager />
         </TabsContent>
       </Tabs>
     </div>
