@@ -180,6 +180,44 @@ async function updateStatus(
   });
 }
 
+// Plan §4: "a global apply toggle lets admin apply the same slot/venue setup
+// across all shortlisted candidates at once, or set individually" — this is
+// the bulk path; updateStatus above remains the individual one. Validates
+// every id belongs to this drive *before* writing anything, so a mixed
+// valid/invalid batch fails cleanly instead of partially applying.
+async function bulkSetInterviewSchedule(driveId, universityId, { applicationIds, interviewSlot, interviewVenue }) {
+  if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+    throw ApiError.badRequest('applicationIds must be a non-empty array');
+  }
+  if (interviewSlot === undefined && interviewVenue === undefined) {
+    throw ApiError.badRequest('interviewSlot or interviewVenue is required');
+  }
+
+  const drive = await drivesService.requireScoped(driveId, universityId);
+  const uniqueIds = [...new Set(applicationIds)];
+
+  const matchingCount = await prisma.application.count({
+    where: { id: { in: uniqueIds }, driveId: drive.id },
+  });
+  if (matchingCount !== uniqueIds.length) {
+    throw ApiError.badRequest('One or more applicationIds do not belong to this drive');
+  }
+
+  await prisma.application.updateMany({
+    where: { id: { in: uniqueIds } },
+    data: {
+      ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
+      ...(interviewVenue !== undefined && { interviewVenue }),
+    },
+  });
+
+  return prisma.application.findMany({
+    where: { id: { in: uniqueIds } },
+    include: APPLICANT_INCLUDE,
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
 module.exports = {
   APPLICATION_STATUSES,
   applyToDrive,
@@ -187,4 +225,5 @@ module.exports = {
   listForStudent,
   getForUser,
   updateStatus,
+  bulkSetInterviewSchedule,
 };

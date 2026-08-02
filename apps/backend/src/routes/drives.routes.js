@@ -33,4 +33,12 @@ router.put(
 router.post('/:driveId/applications', requireRole('STUDENT'), applicationsController.applyToDrive);
 router.get('/:driveId/applications', requireRole('ADMIN'), applicationsController.listForDrive);
 
+// Global apply toggle (plan §4): same interview slot/venue across a chosen
+// batch of applications for this drive in one call.
+router.patch(
+  '/:driveId/applications/interview-schedule',
+  requireRole('ADMIN'),
+  applicationsController.bulkSetInterviewSchedule
+);
+
 module.exports = router;

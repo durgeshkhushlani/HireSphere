@@ -5,6 +5,7 @@ const {
   api,
   auth,
   createUniversity,
+  createProgram,
   createCompany,
   createDrive,
   registerAdmin,
@@ -258,6 +259,98 @@ describe('PATCH /api/applications/:id/status', () => {
       .patch(`/api/applications/${created.body.id}/status`)
       .set(...auth(student.token))
       .send({ status: 'SELECTED' });
+
+    assert.equal(res.status, 403);
+  });
+});
+
+describe('PATCH /api/drives/:driveId/applications/interview-schedule (global apply toggle)', () => {
+  const scheduleFor = (driveId, token, body) =>
+    api()
+      .patch(`/api/drives/${driveId}/applications/interview-schedule`)
+      .set(...auth(token))
+      .send(body);
+
+  test('applies the same slot and venue to every listed application', async () => {
+    const { university, program, admin, student, drive } = await seedScenario();
+    const other = await registerStudent(university.id, program.id);
+    const first = await applyTo(drive.id, student.token);
+    const second = await applyTo(drive.id, other.token);
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [first.body.id, second.body.id],
+      interviewSlot: '2026-09-01T10:00:00.000Z',
+      interviewVenue: 'Room 204',
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.length, 2);
+    for (const application of res.body) {
+      assert.equal(application.interviewVenue, 'Room 204');
+      assert.equal(new Date(application.interviewSlot).toISOString(), '2026-09-01T10:00:00.000Z');
+    }
+  });
+
+  test('does not change status', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      interviewVenue: 'Room 204',
+    });
+
+    assert.equal(res.body[0].status, 'APPLIED');
+  });
+
+  test('rejects if any applicationId does not belong to this drive, applying nothing', async () => {
+    const { university, admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const otherCompany = await createCompany();
+    const otherDrive = await createDrive(university.id, otherCompany.id, { status: 'OPEN' });
+    const otherProgram = await createProgram();
+    const otherStudent = await registerStudent(university.id, otherProgram.id);
+    const foreign = await applyTo(otherDrive.id, otherStudent.token);
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id, foreign.body.id],
+      interviewVenue: 'Room 204',
+    });
+
+    assert.equal(res.status, 400);
+
+    const unchanged = await api()
+      .get(`/api/applications/${created.body.id}`)
+      .set(...auth(admin.token));
+    assert.equal(unchanged.body.interviewVenue, null, 'the valid id must not have been updated either');
+  });
+
+  test('rejects an empty applicationIds array with 400', async () => {
+    const { admin, drive } = await seedScenario();
+
+    const res = await scheduleFor(drive.id, admin.token, { applicationIds: [] });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects when neither interviewSlot nor interviewVenue is given', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await scheduleFor(drive.id, admin.token, { applicationIds: [created.body.id] });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('is forbidden to students', async () => {
+    const { student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await scheduleFor(drive.id, student.token, {
+      applicationIds: [created.body.id],
+      interviewVenue: 'Room 204',
+    });
 
     assert.equal(res.status, 403);
   });

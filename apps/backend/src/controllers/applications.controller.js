@@ -32,4 +32,20 @@ async function updateStatus(req, res) {
   res.json(application);
 }
 
-module.exports = { applyToDrive, listForDrive, listMine, getById, updateStatus };
+async function bulkSetInterviewSchedule(req, res) {
+  const applications = await applicationsService.bulkSetInterviewSchedule(
+    req.params.driveId,
+    req.user.universityId,
+    req.body
+  );
+  res.json(applications);
+}
+
+module.exports = {
+  applyToDrive,
+  listForDrive,
+  listMine,
+  getById,
+  updateStatus,
+  bulkSetInterviewSchedule,
+};
