@@ -5,7 +5,6 @@ const {
   api,
   auth,
   createUniversity,
-  createProgram,
   createCompany,
   createDrive,
   registerAdmin,

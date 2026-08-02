@@ -12,7 +12,7 @@ function requireAuth(req, res, next) {
     const payload = verifyToken(token);
     req.user = { id: payload.sub, role: payload.role, universityId: payload.universityId };
     next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

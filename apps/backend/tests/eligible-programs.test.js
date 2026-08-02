@@ -184,7 +184,7 @@ describe('applying respects program eligibility', () => {
   });
 
   test('clearing the restriction re-opens the drive to all programs', async () => {
-    const { university, admin, student, drive, program } = await seedScenario();
+    const { university, admin, student, drive } = await seedScenario();
     const otherProgram = await createProgram();
     await createUniversityProgram(university.id, otherProgram.id);
     await putEligible(drive.id, admin.token, [otherProgram.id]);

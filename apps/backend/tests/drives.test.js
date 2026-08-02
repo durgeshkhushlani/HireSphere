@@ -5,11 +5,9 @@ const {
   api,
   auth,
   createUniversity,
-  createProgram,
   createCompany,
   createDrive,
   registerAdmin,
-  registerStudent,
   seedScenario,
 } = require('./helpers/factories');
 
