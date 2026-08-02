@@ -1,0 +1,9 @@
+**/node_modules
+.git
+.claude
+legacy
+apps/backend/src/generated
+apps/backend/tests
+apps/backend/.env
+.env
+*.md
