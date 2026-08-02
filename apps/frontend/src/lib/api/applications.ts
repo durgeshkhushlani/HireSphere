@@ -31,6 +31,8 @@ export type ApplicantEntry = {
   interviewSlot: string | null;
   interviewVenue: string | null;
   status: ApplicationStatus;
+  resumeDispatchAt: string | null;
+  resumeSentAt: string | null;
   createdAt: string;
   studentProfile: {
     user: { id: string; name: string; email: string };
@@ -52,6 +54,13 @@ export function updateApplicationStatus(
     body: input,
     token,
   });
+}
+
+export function scheduleResumeDelivery(id: string, dispatchAt: string, token: string) {
+  return apiFetch<{ id: string; resumeDispatchAt: string | null }>(
+    `/applications/${id}/schedule-resume`,
+    { method: "PATCH", body: { dispatchAt }, token }
+  );
 }
 
 export function bulkSetInterviewSchedule(

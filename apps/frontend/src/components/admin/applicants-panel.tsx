@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
-import { listDrives, type Drive } from "@/lib/api/drives";
+import { getApplicationForm, listDrives, type ApplicationFormQuestion, type Drive } from "@/lib/api/drives";
 import {
   listApplicationsForDrive,
   updateApplicationStatus,
@@ -24,6 +24,7 @@ import {
   type ApplicantEntry,
 } from "@/lib/api/applications";
 import { APPLICATION_STATUS_OPTIONS, applicationStatusStyle, type ApplicationStatus } from "@/lib/status";
+import { ApplicantDetailDialog } from "./applicant-detail-dialog";
 
 type SavePatch = { status: ApplicationStatus; interviewSlot?: string; interviewVenue?: string };
 
@@ -32,6 +33,7 @@ export function ApplicantsPanel() {
   const [drives, setDrives] = useState<Drive[]>([]);
   const [selectedDriveId, setSelectedDriveId] = useState("");
   const [applicants, setApplicants] = useState<ApplicantEntry[] | null>(null);
+  const [questions, setQuestions] = useState<ApplicationFormQuestion[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSlot, setBulkSlot] = useState("");
   const [bulkVenue, setBulkVenue] = useState("");
@@ -61,6 +63,22 @@ export function ApplicantsPanel() {
   useEffect(() => {
     if (selectedDriveId) loadApplicants(selectedDriveId);
   }, [selectedDriveId, loadApplicants]);
+
+  useEffect(() => {
+    if (!token || !selectedDriveId) {
+      setQuestions([]);
+      return;
+    }
+    getApplicationForm(selectedDriveId, token)
+      .then((form) => setQuestions(form.questions))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setQuestions([]);
+          return;
+        }
+        toast.error(err instanceof ApiError ? err.message : "Couldn't load the application form");
+      });
+  }, [selectedDriveId, token]);
 
   async function handleUpdate(applicant: ApplicantEntry, patch: SavePatch) {
     if (!token) return;
@@ -182,7 +200,9 @@ export function ApplicantsPanel() {
               <ApplicantRow
                 key={applicant.id}
                 applicant={applicant}
+                questions={questions}
                 onSave={handleUpdate}
+                onScheduled={() => loadApplicants(selectedDriveId)}
                 selected={selectedIds.has(applicant.id)}
                 onToggleSelect={() => toggleSelected(applicant.id)}
               />
@@ -196,12 +216,16 @@ export function ApplicantsPanel() {
 
 function ApplicantRow({
   applicant,
+  questions,
   onSave,
+  onScheduled,
   selected,
   onToggleSelect,
 }: {
   applicant: ApplicantEntry;
+  questions: ApplicationFormQuestion[];
   onSave: (applicant: ApplicantEntry, patch: SavePatch) => void;
+  onScheduled: () => void;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
@@ -276,6 +300,12 @@ function ApplicantRow({
         >
           Save
         </Button>
+
+        <ApplicantDetailDialog
+          applicant={applicant}
+          questions={questions}
+          onScheduled={onScheduled}
+        />
       </CardContent>
     </Card>
   );
