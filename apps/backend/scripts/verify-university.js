@@ -20,8 +20,12 @@ async function main() {
     console.error(`No university found matching "${identifier}"`);
     process.exit(1);
   }
+  const contact = university.contactEmail
+    ? `${university.contactName || 'unnamed contact'} <${university.contactEmail}>`
+    : 'no contact info on file';
+
   if (university.verified) {
-    console.log(`Already verified: ${university.name} (${university.domain})`);
+    console.log(`Already verified: ${university.name} (${university.domain}) — ${contact}`);
     await prisma.$disconnect();
     return;
   }
@@ -30,7 +34,7 @@ async function main() {
     where: { id: university.id },
     data: { verified: true },
   });
-  console.log(`Verified: ${updated.name} (${updated.domain})`);
+  console.log(`Verified: ${updated.name} (${updated.domain}) — ${contact}`);
   await prisma.$disconnect();
 }
 

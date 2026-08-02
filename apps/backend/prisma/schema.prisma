@@ -35,10 +35,12 @@ enum ApplicationStatus {
 }
 
 model University {
-  id       String  @id @default(uuid())
-  name     String
-  domain   String  @unique
-  verified Boolean @default(false)
+  id           String  @id @default(uuid())
+  name         String
+  domain       String  @unique
+  verified     Boolean @default(false)
+  contactName  String? @map("contact_name")
+  contactEmail String? @map("contact_email")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
