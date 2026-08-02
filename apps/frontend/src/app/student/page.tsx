@@ -1,13 +1,29 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { StudentDashboard } from "@/components/student/student-dashboard";
 import { useAuth } from "@/lib/auth-context";
 
 export default function StudentDashboardPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace("/auth?mode=login&role=student");
+    } else if (user.role !== "STUDENT") {
+      router.replace("/admin");
+    }
+  }, [loading, user, router]);
+
+  if (loading || !user || user.role !== "STUDENT") return null;
+
   return (
-    <div className="p-10">
-      <h1 className="text-2xl font-extrabold">Welcome, {user?.name ?? "student"}</h1>
-      <p className="mt-2 text-muted-foreground">Student dashboard — under construction.</p>
-    </div>
+    <DashboardShell roleLabel="Student">
+      <StudentDashboard />
+    </DashboardShell>
   );
 }
