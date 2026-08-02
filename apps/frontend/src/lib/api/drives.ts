@@ -45,3 +45,50 @@ export function applyToDrive(
     token,
   });
 }
+
+export function createDrive(
+  input: {
+    companyId: string;
+    title: string;
+    description?: string;
+    minCgpa?: number;
+    maxBacklogs?: number;
+  },
+  token: string
+) {
+  return apiFetch<Drive>("/drives", { method: "POST", body: input, token });
+}
+
+export function updateDriveStatus(driveId: string, status: DriveStatus, token: string) {
+  return apiFetch<Drive>(`/drives/${driveId}/status`, {
+    method: "PATCH",
+    body: { status },
+    token,
+  });
+}
+
+export function setApplicationForm(
+  driveId: string,
+  questions: ApplicationFormQuestion[],
+  token: string
+) {
+  return apiFetch<ApplicationForm>(`/drives/${driveId}/application-form`, {
+    method: "PUT",
+    body: { questions },
+    token,
+  });
+}
+
+export function getEligiblePrograms(driveId: string, token: string) {
+  return apiFetch<{ id: string; name: string }[]>(`/drives/${driveId}/eligible-programs`, {
+    token,
+  });
+}
+
+export function setEligiblePrograms(driveId: string, programIds: string[], token: string) {
+  return apiFetch<{ id: string; name: string }[]>(`/drives/${driveId}/eligible-programs`, {
+    method: "PUT",
+    body: { programIds },
+    token,
+  });
+}
