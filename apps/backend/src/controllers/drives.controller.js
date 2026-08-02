@@ -34,6 +34,19 @@ async function setApplicationForm(req, res) {
   res.json(form);
 }
 
+async function getEligiblePrograms(req, res) {
+  res.json(await drivesService.getEligiblePrograms(req.params.driveId, req.user.universityId));
+}
+
+async function setEligiblePrograms(req, res) {
+  const programs = await drivesService.setEligiblePrograms(
+    req.params.driveId,
+    req.user.universityId,
+    req.body.programIds
+  );
+  res.json(programs);
+}
+
 module.exports = {
   list,
   getById,
@@ -41,4 +54,6 @@ module.exports = {
   updateStatus,
   getApplicationForm,
   setApplicationForm,
+  getEligiblePrograms,
+  setEligiblePrograms,
 };

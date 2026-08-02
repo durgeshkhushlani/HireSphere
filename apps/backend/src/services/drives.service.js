@@ -85,6 +85,51 @@ async function setApplicationForm(driveId, universityId, questions) {
   });
 }
 
+// No rows for a drive means "no program restriction" — same convention as
+// the null minCgpa/maxBacklogs columns.
+async function getEligiblePrograms(driveId, universityId) {
+  const drive = await requireScoped(driveId, universityId);
+
+  const rows = await prisma.driveEligibleProgram.findMany({
+    where: { driveId: drive.id },
+    include: { universityProgram: { include: { program: true } } },
+  });
+  return rows.map((row) => row.universityProgram.program);
+}
+
+async function setEligiblePrograms(driveId, universityId, programIds) {
+  if (!Array.isArray(programIds)) {
+    throw ApiError.badRequest('programIds must be an array');
+  }
+
+  const drive = await requireScoped(driveId, universityId);
+  const uniqueProgramIds = [...new Set(programIds)];
+
+  // A program can only be made eligible if this university actually offers
+  // it (i.e. a UniversityProgram link exists) — the join table this feature
+  // hangs off scopes eligibility per-university, not per-program globally.
+  const universityPrograms = await prisma.universityProgram.findMany({
+    where: { universityId, programId: { in: uniqueProgramIds } },
+  });
+  if (universityPrograms.length !== uniqueProgramIds.length) {
+    throw ApiError.badRequest('One or more programIds are not offered at this university');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.driveEligibleProgram.deleteMany({ where: { driveId: drive.id } });
+    if (universityPrograms.length > 0) {
+      await tx.driveEligibleProgram.createMany({
+        data: universityPrograms.map((up) => ({
+          driveId: drive.id,
+          universityProgramId: up.id,
+        })),
+      });
+    }
+  });
+
+  return getEligiblePrograms(drive.id, universityId);
+}
+
 module.exports = {
   DRIVE_STATUSES,
   requireScoped,
@@ -94,4 +139,6 @@ module.exports = {
   updateStatus,
   getApplicationForm,
   setApplicationForm,
+  getEligiblePrograms,
+  setEligiblePrograms,
 };

@@ -52,6 +52,10 @@ async function registerStudent(universityId, programId, overrides = {}) {
   return { token: res.body.token, user: res.body.user, res };
 }
 
+function createUniversityProgram(universityId, programId) {
+  return prisma.universityProgram.create({ data: { universityId, programId } });
+}
+
 function createDrive(universityId, companyId, overrides = {}) {
   return prisma.drive.create({
     data: { universityId, companyId, title: `Drive ${unique()}`, ...overrides },
@@ -80,6 +84,7 @@ module.exports = {
   createUniversity,
   createProgram,
   createCompany,
+  createUniversityProgram,
   createDrive,
   registerAdmin,
   registerStudent,

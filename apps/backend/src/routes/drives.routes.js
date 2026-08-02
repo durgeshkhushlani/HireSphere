@@ -21,6 +21,14 @@ router.put(
   drivesController.setApplicationForm
 );
 
+// Per-drive program eligibility restriction.
+router.get('/:driveId/eligible-programs', drivesController.getEligiblePrograms);
+router.put(
+  '/:driveId/eligible-programs',
+  requireRole('ADMIN'),
+  drivesController.setEligiblePrograms
+);
+
 // Applications nested under a drive.
 router.post('/:driveId/applications', requireRole('STUDENT'), applicationsController.applyToDrive);
 router.get('/:driveId/applications', requireRole('ADMIN'), applicationsController.listForDrive);

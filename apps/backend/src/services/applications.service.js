@@ -42,6 +42,18 @@ async function assertEligible(drive, studentProfileId) {
   if (drive.maxBacklogs != null && profile.backlogCount > drive.maxBacklogs) {
     throw ApiError.forbidden(`This drive allows at most ${drive.maxBacklogs} backlog(s)`);
   }
+
+  // Program restriction: no DriveEligibleProgram rows means open to every program.
+  const eligiblePrograms = await prisma.driveEligibleProgram.findMany({
+    where: { driveId: drive.id },
+    include: { universityProgram: true },
+  });
+  if (eligiblePrograms.length > 0) {
+    const allowedProgramIds = eligiblePrograms.map((ep) => ep.universityProgram.programId);
+    if (!allowedProgramIds.includes(profile.programId)) {
+      throw ApiError.forbidden('Your program is not eligible for this drive');
+    }
+  }
 }
 
 async function applyToDrive({ driveId, universityId, studentProfileId, responses, resumeUrl }) {
