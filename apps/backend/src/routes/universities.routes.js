@@ -8,4 +8,8 @@ const router = express.Router();
 router.get('/', universitiesController.list);
 router.post('/', universitiesController.create);
 
+// Also unauthenticated: a student needs to see which programs their
+// university offers before they have any account/token to register with.
+router.get('/:universityId/programs', universitiesController.listPrograms);
+
 module.exports = router;
