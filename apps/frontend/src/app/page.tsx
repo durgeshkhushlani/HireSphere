@@ -152,6 +152,7 @@ export default function HomePage() {
             </ul>
             <Button
               className="mt-8 bg-accent text-accent-foreground hover:bg-accent/90"
+              nativeButton={false}
               render={<Link href="/auth?mode=signup&role=admin" />}
             >
               Register your university <ArrowRight className="size-4" />
@@ -237,6 +238,7 @@ export default function HomePage() {
             <Button
               variant="outline"
               className="mt-8 border-primary text-primary hover:bg-primary/10"
+              nativeButton={false}
               render={<Link href="/auth?mode=signup&role=student" />}
             >
               Get started as a student <ArrowRight className="size-4" />
@@ -272,6 +274,7 @@ export default function HomePage() {
           <Button
             size="lg"
             className="mt-2 bg-accent text-accent-foreground hover:bg-accent/90"
+            nativeButton={false}
             render={<Link href="/auth?mode=signup" />}
           >
             Get started <ArrowRight className="size-4" />

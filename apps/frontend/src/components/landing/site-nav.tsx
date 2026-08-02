@@ -39,11 +39,12 @@ export function SiteNav() {
       </div>
 
       <div className="hidden items-center gap-3 sm:flex">
-        <Button variant="ghost" render={<Link href="/auth?mode=login" />}>
+        <Button variant="ghost" nativeButton={false} render={<Link href="/auth?mode=login" />}>
           Log in
         </Button>
         <Button
           className="bg-accent text-accent-foreground hover:bg-accent/90"
+          nativeButton={false}
           render={<Link href="/auth?mode=signup" />}
         >
           Get started
@@ -69,11 +70,16 @@ export function SiteNav() {
               </a>
             ))}
             <div className="mt-4 flex flex-col gap-2 border-t pt-4">
-              <Button variant="outline" render={<Link href="/auth?mode=login" />}>
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/auth?mode=login" />}
+              >
                 Log in
               </Button>
               <Button
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
+                nativeButton={false}
                 render={<Link href="/auth?mode=signup" />}
               >
                 Get started
