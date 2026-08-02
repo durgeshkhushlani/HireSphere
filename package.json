@@ -16,7 +16,8 @@
   "allowScripts": {
     "@prisma/engines@7.9.1": true,
     "prisma@7.9.1": true,
-    "esbuild@0.28.1": true
+    "esbuild@0.28.1": true,
+    "unrs-resolver@1.12.2": true
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
