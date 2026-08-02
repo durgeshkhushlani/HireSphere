@@ -29,10 +29,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // One-time hydration from localStorage (an external system, unavailable
+    // during SSR) — exactly the case react-hooks/set-state-in-effect's own
+    // docs describe as fine to allow: "subscribe for updates from an
+    // external system, calling setState in a callback".
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as { token: string; user: AuthUser };
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setToken(parsed.token);
         setUser(parsed.user);
       } catch {
