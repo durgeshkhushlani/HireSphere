@@ -21,3 +21,35 @@ export type Application = {
 export function listMyApplications(token: string) {
   return apiFetch<Application[]>("/applications/me", { token });
 }
+
+export type ApplicantEntry = {
+  id: string;
+  driveId: string;
+  studentProfileId: string;
+  responses: Record<string, string>;
+  resumeUrl: string | null;
+  interviewSlot: string | null;
+  interviewVenue: string | null;
+  status: ApplicationStatus;
+  createdAt: string;
+  studentProfile: {
+    user: { id: string; name: string; email: string };
+    program: { id: string; name: string };
+  };
+};
+
+export function listApplicationsForDrive(driveId: string, token: string) {
+  return apiFetch<ApplicantEntry[]>(`/drives/${driveId}/applications`, { token });
+}
+
+export function updateApplicationStatus(
+  id: string,
+  input: { status: ApplicationStatus; interviewSlot?: string; interviewVenue?: string },
+  token: string
+) {
+  return apiFetch<ApplicantEntry>(`/applications/${id}/status`, {
+    method: "PATCH",
+    body: input,
+    token,
+  });
+}
