@@ -12,4 +12,8 @@ async function create(req, res) {
   res.status(201).json(await companiesService.create(req.body));
 }
 
-module.exports = { list, getById, create };
+async function update(req, res) {
+  res.json(await companiesService.update(req.params.id, req.body));
+}
+
+module.exports = { list, getById, create, update };

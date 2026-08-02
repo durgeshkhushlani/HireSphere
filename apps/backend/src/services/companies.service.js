@@ -16,4 +16,19 @@ function create({ name, industry, contactEmail, contactPhone }) {
   return prisma.company.create({ data: { name, industry, contactEmail, contactPhone } });
 }
 
-module.exports = { list, getById, create };
+async function update(id, { name, industry, contactEmail, contactPhone }) {
+  await getById(id);
+  if (name !== undefined && !name) throw ApiError.badRequest('name cannot be empty');
+
+  return prisma.company.update({
+    where: { id },
+    data: {
+      ...(name !== undefined && { name }),
+      ...(industry !== undefined && { industry }),
+      ...(contactEmail !== undefined && { contactEmail }),
+      ...(contactPhone !== undefined && { contactPhone }),
+    },
+  });
+}
+
+module.exports = { list, getById, create, update };

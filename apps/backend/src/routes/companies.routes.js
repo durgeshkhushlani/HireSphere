@@ -10,5 +10,6 @@ router.use(requireAuth);
 router.get('/', companiesController.list);
 router.get('/:id', companiesController.getById);
 router.post('/', requireRole('ADMIN'), companiesController.create);
+router.patch('/:id', requireRole('ADMIN'), companiesController.update);
 
 module.exports = router;
