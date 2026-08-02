@@ -1,13 +1,10 @@
-import path from "node:path";
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  // This worktree checkout has its own package-lock.json, separate from the
-  // main checkout's — Turbopack otherwise guesses the wrong workspace root
-  // when both are visible on disk.
-  turbopack: {
-    root: path.join(__dirname, "../.."),
-  },
-};
+// Note: Turbopack prints a workspace-root warning on startup because this
+// worktree checkout has its own package-lock.json alongside the main
+// checkout's — cosmetic only, module resolution works correctly either way.
+// An explicit `turbopack.root` override was tried and made things worse
+// (broke resolution entirely), so leaving this alone.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
