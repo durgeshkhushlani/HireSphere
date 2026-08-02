@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
+import { ChatWidget } from "@/components/chat/chat-widget";
 
 function initialsFor(name: string | undefined) {
   if (!name) return "?";
@@ -71,6 +72,7 @@ export function DashboardShell({
       </header>
 
       <main className="flex-1 bg-muted/30">{children}</main>
+      <ChatWidget />
     </div>
   );
 }
