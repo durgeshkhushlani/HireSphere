@@ -3,6 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DriveManager } from "./drive-manager";
 import { ApplicantsPanel } from "./applicants-panel";
+import { PlacementsOverview } from "./placements-overview";
 
 export function AdminDashboard() {
   return (
@@ -16,12 +17,16 @@ export function AdminDashboard() {
         <TabsList>
           <TabsTrigger value="drives">Drives</TabsTrigger>
           <TabsTrigger value="applicants">Applicants</TabsTrigger>
+          <TabsTrigger value="placements">Placements</TabsTrigger>
         </TabsList>
         <TabsContent value="drives" className="mt-6">
           <DriveManager />
         </TabsContent>
         <TabsContent value="applicants" className="mt-6">
           <ApplicantsPanel />
+        </TabsContent>
+        <TabsContent value="placements" className="mt-6">
+          <PlacementsOverview />
         </TabsContent>
       </Tabs>
     </div>
