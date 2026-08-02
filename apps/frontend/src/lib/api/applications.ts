@@ -53,3 +53,15 @@ export function updateApplicationStatus(
     token,
   });
 }
+
+export function bulkSetInterviewSchedule(
+  driveId: string,
+  input: { applicationIds: string[]; interviewSlot?: string; interviewVenue?: string },
+  token: string
+) {
+  return apiFetch<ApplicantEntry[]>(`/drives/${driveId}/applications/interview-schedule`, {
+    method: "PATCH",
+    body: input,
+    token,
+  });
+}

@@ -20,6 +20,7 @@ import { listDrives, type Drive } from "@/lib/api/drives";
 import {
   listApplicationsForDrive,
   updateApplicationStatus,
+  bulkSetInterviewSchedule,
   type ApplicantEntry,
 } from "@/lib/api/applications";
 import { APPLICATION_STATUS_OPTIONS, applicationStatusStyle, type ApplicationStatus } from "@/lib/status";
@@ -31,6 +32,10 @@ export function ApplicantsPanel() {
   const [drives, setDrives] = useState<Drive[]>([]);
   const [selectedDriveId, setSelectedDriveId] = useState("");
   const [applicants, setApplicants] = useState<ApplicantEntry[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSlot, setBulkSlot] = useState("");
+  const [bulkVenue, setBulkVenue] = useState("");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -43,6 +48,7 @@ export function ApplicantsPanel() {
     async (driveId: string) => {
       if (!token || !driveId) return;
       setApplicants(null);
+      setSelectedIds(new Set());
       try {
         setApplicants(await listApplicationsForDrive(driveId, token));
       } catch (err) {
@@ -64,6 +70,43 @@ export function ApplicantsPanel() {
       loadApplicants(selectedDriveId);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't update applicant");
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkSchedule() {
+    if (!token || !selectedDriveId) return;
+    if (!bulkSlot && !bulkVenue) {
+      toast.error("Set an interview slot or venue first");
+      return;
+    }
+    setBulkSubmitting(true);
+    try {
+      await bulkSetInterviewSchedule(
+        selectedDriveId,
+        {
+          applicationIds: [...selectedIds],
+          interviewSlot: bulkSlot ? new Date(bulkSlot).toISOString() : undefined,
+          interviewVenue: bulkVenue || undefined,
+        },
+        token
+      );
+      toast.success(`Scheduled interviews for ${selectedIds.size} applicant(s)`);
+      setBulkSlot("");
+      setBulkVenue("");
+      loadApplicants(selectedDriveId);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't schedule interviews");
+    } finally {
+      setBulkSubmitting(false);
     }
   }
 
@@ -100,11 +143,52 @@ export function ApplicantsPanel() {
           No applications yet for this drive.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {applicants.map((applicant) => (
-            <ApplicantRow key={applicant.id} applicant={applicant} onSave={handleUpdate} />
-          ))}
-        </div>
+        <>
+          {selectedIds.size > 0 && (
+            <Card size="sm" className="border-primary/40 bg-primary/5">
+              <CardContent className="flex flex-wrap items-center gap-3">
+                <span className="text-xs font-bold text-primary">
+                  {selectedIds.size} selected — bulk-schedule interview
+                </span>
+                <Input
+                  type="datetime-local"
+                  value={bulkSlot}
+                  onChange={(e) => setBulkSlot(e.target.value)}
+                  className="h-7 w-[190px] text-xs"
+                />
+                <Input
+                  value={bulkVenue}
+                  onChange={(e) => setBulkVenue(e.target.value)}
+                  placeholder="Venue"
+                  className="h-7 w-[140px] text-xs"
+                />
+                <Button size="sm" disabled={bulkSubmitting} onClick={handleBulkSchedule}>
+                  {bulkSubmitting ? "Applying…" : "Apply to selected"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedIds(new Set())}
+                  disabled={bulkSubmitting}
+                >
+                  Clear
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {applicants.map((applicant) => (
+              <ApplicantRow
+                key={applicant.id}
+                applicant={applicant}
+                onSave={handleUpdate}
+                selected={selectedIds.has(applicant.id)}
+                onToggleSelect={() => toggleSelected(applicant.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -113,9 +197,13 @@ export function ApplicantsPanel() {
 function ApplicantRow({
   applicant,
   onSave,
+  selected,
+  onToggleSelect,
 }: {
   applicant: ApplicantEntry;
   onSave: (applicant: ApplicantEntry, patch: SavePatch) => void;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const [status, setStatus] = useState<ApplicationStatus>(applicant.status);
   const [interviewSlot, setInterviewSlot] = useState(
@@ -131,6 +219,14 @@ function ApplicantRow({
   return (
     <Card size="sm">
       <CardContent className="flex flex-wrap items-center gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          className="size-4 shrink-0 rounded border-input"
+          aria-label={`Select ${applicant.studentProfile.user.name}`}
+        />
+
         <div className="min-w-[160px] flex-1">
           <div className="text-sm font-bold">{applicant.studentProfile.user.name}</div>
           <div className="text-xs text-muted-foreground">
