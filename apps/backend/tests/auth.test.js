@@ -6,6 +6,7 @@ const {
   auth,
   createUniversity,
   createProgram,
+  requestAndVerifyOtp,
   registerAdmin,
   registerStudent,
 } = require('./helpers/factories');
@@ -49,24 +50,50 @@ describe('POST /api/auth/register/admin', () => {
     const university = await createUniversity();
     const { user } = await registerAdmin(university.id);
 
-    const res = await api()
-      .post('/api/auth/register/admin')
-      .send({
-        universityId: university.id,
-        email: user.email,
-        password: 'secret123',
-        name: 'Someone Else',
-      });
+    // Re-verifying the same email is allowed at the OTP layer — the conflict
+    // only surfaces once registration itself hits the unique email constraint.
+    const verificationToken = await requestAndVerifyOtp(user.email);
+    const res = await api().post('/api/auth/register/admin').send({
+      verificationToken,
+      email: user.email,
+      password: 'secret123',
+      name: 'Someone Else',
+    });
 
     assert.equal(res.status, 409);
   });
 
-  test('rejects an unknown universityId with 400', async () => {
+  test('rejects a missing verificationToken with 400', async () => {
     const res = await api().post('/api/auth/register/admin').send({
-      universityId: '00000000-0000-0000-0000-000000000000',
       email: 'nobody@test.edu',
       password: 'secret123',
       name: 'Nobody',
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects a garbage verificationToken with 400', async () => {
+    const res = await api().post('/api/auth/register/admin').send({
+      verificationToken: 'not-a-real-token',
+      email: 'nobody@test.edu',
+      password: 'secret123',
+      name: 'Nobody',
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects a verificationToken issued for a different email with 400', async () => {
+    const university = await createUniversity();
+    const email = `owner-${Date.now()}@${university.domain}`;
+    const verificationToken = await requestAndVerifyOtp(email);
+
+    const res = await api().post('/api/auth/register/admin').send({
+      verificationToken,
+      email: `someone-else-${Date.now()}@${university.domain}`,
+      password: 'secret123',
+      name: 'Impersonator',
     });
 
     assert.equal(res.status, 400);
@@ -90,11 +117,13 @@ describe('POST /api/auth/register/student', () => {
 
   test('does not leave an orphan user when the profile fails', async () => {
     const university = await createUniversity();
+    const email = `orphan-${Date.now()}@${university.domain}`;
+    const verificationToken = await requestAndVerifyOtp(email);
 
     const res = await api().post('/api/auth/register/student').send({
-      universityId: university.id,
+      verificationToken,
       programId: '00000000-0000-0000-0000-000000000000',
-      email: 'orphan@test.edu',
+      email,
       password: 'secret123',
       name: 'Orphan',
       cgpa: 8,
@@ -104,7 +133,7 @@ describe('POST /api/auth/register/student', () => {
 
     // The whole registration runs in one transaction — a bad programId must
     // roll the user back too, otherwise the email is burned but unusable.
-    const user = await prisma.user.findUnique({ where: { email: 'orphan@test.edu' } });
+    const user = await prisma.user.findUnique({ where: { email } });
     assert.equal(user, null);
   });
 });

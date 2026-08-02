@@ -191,6 +191,18 @@ model Application {
   @@map("applications")
 }
 
+model EmailOtp {
+  id         String    @id @default(uuid())
+  email      String    @unique
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("email_otps")
+}
+
 model Placement {
   id            String   @id @default(uuid())
   universityId  String   @map("university_id")

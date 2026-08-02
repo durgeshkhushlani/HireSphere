@@ -8,6 +8,8 @@ const DEFAULT_TEST_URL =
 
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || DEFAULT_TEST_URL;
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+// Switches src/lib/mailer.js to a fake transport that never sends real email.
+process.env.NODE_ENV = 'test';
 
 if (!/test/i.test(process.env.DATABASE_URL)) {
   throw new Error(

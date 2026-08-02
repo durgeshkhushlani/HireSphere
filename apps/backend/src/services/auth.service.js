@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
 const { signToken } = require('../lib/jwt');
 const ApiError = require('../lib/ApiError');
+const otpService = require('./otp.service');
 
 const SALT_ROUNDS = 10;
 
@@ -17,11 +18,14 @@ function authPayload(user) {
   };
 }
 
-async function registerAdmin({ universityId, email, password, name }) {
-  if (!universityId || !email || !password || !name) {
-    throw ApiError.badRequest('universityId, email, password and name are required');
+async function registerAdmin({ verificationToken, email, password, name }) {
+  if (!email || !password || !name) {
+    throw ApiError.badRequest('email, password and name are required');
   }
 
+  // universityId is derived from the OTP-verified token, never accepted
+  // directly from the client — see otp.service.js.
+  const universityId = otpService.resolveRegistration(verificationToken, email);
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   try {
@@ -31,18 +35,16 @@ async function registerAdmin({ universityId, email, password, name }) {
     return authPayload(user);
   } catch (err) {
     if (err.code === 'P2002') throw ApiError.conflict('Email already registered');
-    if (err.code === 'P2003') throw ApiError.badRequest('universityId does not exist');
     throw err;
   }
 }
 
-async function registerStudent({ universityId, programId, email, password, name, cgpa }) {
-  if (!universityId || !programId || !email || !password || !name || cgpa === undefined) {
-    throw ApiError.badRequest(
-      'universityId, programId, email, password, name and cgpa are required'
-    );
+async function registerStudent({ verificationToken, programId, email, password, name, cgpa }) {
+  if (!programId || !email || !password || !name || cgpa === undefined) {
+    throw ApiError.badRequest('programId, email, password, name and cgpa are required');
   }
 
+  const universityId = otpService.resolveRegistration(verificationToken, email);
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   try {
@@ -56,7 +58,7 @@ async function registerStudent({ universityId, programId, email, password, name,
     return authPayload(user);
   } catch (err) {
     if (err.code === 'P2002') throw ApiError.conflict('Email already registered');
-    if (err.code === 'P2003') throw ApiError.badRequest('universityId or programId does not exist');
+    if (err.code === 'P2003') throw ApiError.badRequest('programId does not exist');
     throw err;
   }
 }

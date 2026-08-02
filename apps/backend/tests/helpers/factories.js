@@ -2,6 +2,7 @@ require('./env');
 const request = require('supertest');
 const app = require('../../src/app');
 const { prisma } = require('./db');
+const mailer = require('../../src/lib/mailer');
 
 let counter = 0;
 const unique = () => `${Date.now()}-${++counter}`;
@@ -12,8 +13,28 @@ const auth = (token) => ['Authorization', `Bearer ${token}`];
 function createUniversity(overrides = {}) {
   const n = unique();
   return prisma.university.create({
-    data: { name: `Test University ${n}`, domain: `test-${n}.edu`, ...overrides },
+    data: { name: `Test University ${n}`, domain: `test-${n}.edu`, verified: true, ...overrides },
   });
+}
+
+// Drives the real OTP endpoints end-to-end, pulling the code out of the fake
+// mail transport (mailer.js) instead of a real inbox — same flow a real
+// signup goes through, just without a network hop.
+async function requestAndVerifyOtp(email) {
+  const requested = await api().post('/api/auth/otp/request').send({ email });
+  if (requested.status !== 200) {
+    throw new Error(`OTP request failed for ${email}: ${JSON.stringify(requested.body)}`);
+  }
+
+  const message = mailer.getLastTestMessage();
+  const code = message?.text?.match(/\d{6}/)?.[0];
+  if (!code) throw new Error('Could not read OTP code from the captured test message');
+
+  const verified = await api().post('/api/auth/otp/verify').send({ email, code });
+  if (verified.status !== 200) {
+    throw new Error(`OTP verify failed for ${email}: ${JSON.stringify(verified.body)}`);
+  }
+  return verified.body.verificationToken;
 }
 
 function createProgram(overrides = {}) {
@@ -25,11 +46,16 @@ function createCompany(overrides = {}) {
 }
 
 async function registerAdmin(universityId, overrides = {}) {
+  const university = await prisma.university.findUniqueOrThrow({ where: { id: universityId } });
+  const email = overrides.email || `admin-${unique()}@${university.domain}`;
+  const verificationToken =
+    overrides.verificationToken || (await requestAndVerifyOtp(email));
+
   const res = await api()
     .post('/api/auth/register/admin')
     .send({
-      universityId,
-      email: `admin-${unique()}@test.edu`,
+      verificationToken,
+      email,
       password: 'secret123',
       name: 'Test Admin',
       ...overrides,
@@ -38,12 +64,17 @@ async function registerAdmin(universityId, overrides = {}) {
 }
 
 async function registerStudent(universityId, programId, overrides = {}) {
+  const university = await prisma.university.findUniqueOrThrow({ where: { id: universityId } });
+  const email = overrides.email || `student-${unique()}@${university.domain}`;
+  const verificationToken =
+    overrides.verificationToken || (await requestAndVerifyOtp(email));
+
   const res = await api()
     .post('/api/auth/register/student')
     .send({
-      universityId,
+      verificationToken,
       programId,
-      email: `student-${unique()}@test.edu`,
+      email,
       password: 'secret123',
       name: 'Test Student',
       cgpa: 8.5,
@@ -86,6 +117,7 @@ module.exports = {
   createCompany,
   createUniversityProgram,
   createDrive,
+  requestAndVerifyOtp,
   registerAdmin,
   registerStudent,
   seedScenario,
