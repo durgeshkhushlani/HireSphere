@@ -183,6 +183,12 @@ model Application {
   interviewVenue   String?           @map("interview_venue")
   status           ApplicationStatus @default(APPLIED)
 
+  // Resume delivery (plan §4): admin schedules a send time; the poller in
+  // server.js dispatches it once resumeDispatchAt has passed. resumeSentAt
+  // being non-null is the guard against a duplicate send.
+  resumeDispatchAt DateTime? @map("resume_dispatch_at")
+  resumeSentAt     DateTime? @map("resume_sent_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

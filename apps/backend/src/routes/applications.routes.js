@@ -11,5 +11,10 @@ router.use(requireAuth);
 router.get('/me', requireRole('STUDENT'), applicationsController.listMine);
 router.get('/:id', applicationsController.getById);
 router.patch('/:id/status', requireRole('ADMIN'), applicationsController.updateStatus);
+router.patch(
+  '/:id/schedule-resume',
+  requireRole('ADMIN'),
+  applicationsController.scheduleResumeDelivery
+);
 
 module.exports = router;

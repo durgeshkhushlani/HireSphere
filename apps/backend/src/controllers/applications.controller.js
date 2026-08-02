@@ -41,6 +41,15 @@ async function bulkSetInterviewSchedule(req, res) {
   res.json(applications);
 }
 
+async function scheduleResumeDelivery(req, res) {
+  const application = await applicationsService.scheduleResumeDelivery(
+    req.params.id,
+    req.user.universityId,
+    req.body
+  );
+  res.json(application);
+}
+
 module.exports = {
   applyToDrive,
   listForDrive,
@@ -48,4 +57,5 @@ module.exports = {
   getById,
   updateStatus,
   bulkSetInterviewSchedule,
+  scheduleResumeDelivery,
 };

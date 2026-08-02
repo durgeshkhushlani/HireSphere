@@ -218,6 +218,35 @@ async function bulkSetInterviewSchedule(driveId, universityId, { applicationIds,
   });
 }
 
+// Plan §4: resume sent via Nodemailer at a scheduled datetime. Actual
+// dispatch happens in src/jobs/resumeDispatcher.js; this just validates and
+// records the requested time.
+async function scheduleResumeDelivery(id, universityId, { dispatchAt }) {
+  if (!dispatchAt) throw ApiError.badRequest('dispatchAt is required');
+
+  const application = await prisma.application.findUnique({
+    where: { id },
+    include: { drive: { include: { company: true } } },
+  });
+  if (!application || application.drive.universityId !== universityId) {
+    throw ApiError.notFound('Application not found');
+  }
+  if (application.resumeSentAt) {
+    throw ApiError.badRequest('This resume has already been sent');
+  }
+  if (!application.resumeUrl) {
+    throw ApiError.badRequest('This application has no resume to send');
+  }
+  if (!application.drive.company.contactEmail) {
+    throw ApiError.badRequest("This drive's company has no contact email on file");
+  }
+
+  return prisma.application.update({
+    where: { id },
+    data: { resumeDispatchAt: new Date(dispatchAt) },
+  });
+}
+
 module.exports = {
   APPLICATION_STATUSES,
   applyToDrive,
@@ -226,4 +255,5 @@ module.exports = {
   getForUser,
   updateStatus,
   bulkSetInterviewSchedule,
+  scheduleResumeDelivery,
 };
