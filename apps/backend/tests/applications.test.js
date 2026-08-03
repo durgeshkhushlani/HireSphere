@@ -1,6 +1,6 @@
 const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { resetDb, disconnect } = require('./helpers/db');
+const { resetDb, disconnect, prisma } = require('./helpers/db');
 const {
   api,
   auth,
@@ -8,6 +8,7 @@ const {
   createProgram,
   createCompany,
   createDrive,
+  createDriveRole,
   registerAdmin,
   registerStudent,
   seedScenario,
@@ -87,6 +88,78 @@ describe('applying to a drive', () => {
     const res = await applyTo(foreignDrive.id, student.token);
 
     assert.equal(res.status, 404);
+  });
+});
+
+describe('applying to a drive with roles', () => {
+  test('requires rolePreferences when the drive has roles', async () => {
+    const { student, drive } = await seedScenario();
+    await createDriveRole(drive.id);
+
+    const res = await applyTo(drive.id, student.token, { responses: {} });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('accepts a ranked list and stores it in order', async () => {
+    const { student, drive } = await seedScenario();
+    const first = await createDriveRole(drive.id, { title: 'First choice' });
+    const second = await createDriveRole(drive.id, {
+      title: 'Second choice',
+      offerType: 'INTERNSHIP',
+      ctcAmount: undefined,
+      stipendAmount: 20000,
+    });
+
+    const res = await applyTo(drive.id, student.token, {
+      responses: {},
+      rolePreferences: [second.id, first.id],
+    });
+
+    assert.equal(res.status, 201);
+
+    const preferences = await prisma.applicationRolePreference.findMany({
+      where: { applicationId: res.body.id },
+      orderBy: { rank: 'asc' },
+    });
+    assert.equal(preferences.length, 2);
+    assert.equal(preferences[0].driveRoleId, second.id);
+    assert.equal(preferences[0].rank, 1);
+    assert.equal(preferences[1].driveRoleId, first.id);
+    assert.equal(preferences[1].rank, 2);
+  });
+
+  test('rejects duplicate role ids in the preference list', async () => {
+    const { student, drive } = await seedScenario();
+    const role = await createDriveRole(drive.id);
+
+    const res = await applyTo(drive.id, student.token, {
+      responses: {},
+      rolePreferences: [role.id, role.id],
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects a role id that does not belong to the drive', async () => {
+    const { student, drive, university, company } = await seedScenario();
+    const otherDrive = await createDrive(university.id, company.id, { status: 'OPEN' });
+    const foreignRole = await createDriveRole(otherDrive.id);
+
+    const res = await applyTo(drive.id, student.token, {
+      responses: {},
+      rolePreferences: [foreignRole.id],
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('a drive with no roles does not require rolePreferences', async () => {
+    const { student, drive } = await seedScenario();
+
+    const res = await applyTo(drive.id, student.token, { responses: {} });
+
+    assert.equal(res.status, 201);
   });
 });
 

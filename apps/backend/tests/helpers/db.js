@@ -4,10 +4,12 @@ const prisma = require('../../src/lib/prisma');
 // Children before parents so foreign keys never block the truncate.
 const TABLES = [
   'email_otps',
+  'application_role_preferences',
   'placements',
   'applications',
   'application_forms',
   'drive_eligible_programs',
+  'drive_roles',
   'drives',
   'student_profiles',
   'users',

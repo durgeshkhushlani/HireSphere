@@ -29,6 +29,10 @@ router.put(
   drivesController.setEligiblePrograms
 );
 
+// Per-drive roles (title, Internship/Job, JD, CTC/stipend) — read via the
+// drive's own GET, written here as a full replace.
+router.put('/:driveId/roles', requireRole('ADMIN'), drivesController.setRoles);
+
 // Applications nested under a drive.
 router.post('/:driveId/applications', requireRole('STUDENT'), applicationsController.applyToDrive);
 router.get('/:driveId/applications', requireRole('ADMIN'), applicationsController.listForDrive);

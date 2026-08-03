@@ -4,7 +4,14 @@
 const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resetDb, disconnect, prisma } = require('./helpers/db');
-const { api, auth, createCompany, createDrive, seedScenario } = require('./helpers/factories');
+const {
+  api,
+  auth,
+  createCompany,
+  createDrive,
+  createDriveRole,
+  seedScenario,
+} = require('./helpers/factories');
 
 beforeEach(resetDb);
 after(disconnect);
@@ -175,6 +182,95 @@ describe('selection creates a placement and locks the student', () => {
       where: { userId: student.user.id },
     });
     assert.equal(profile.placementLocked, false);
+  });
+});
+
+describe('selecting with roles', () => {
+  const applyWithRoles = (driveId, token, rolePreferences) =>
+    api()
+      .post(`/api/drives/${driveId}/applications`)
+      .set(...auth(token))
+      .send({ responses: {}, rolePreferences });
+
+  test('SELECTED requires selectedRoleId when the drive has roles', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const role = await createDriveRole(drive.id);
+    const application = await applyWithRoles(drive.id, student.token, [role.id]);
+
+    const res = await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects a selectedRoleId the student never preferred', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const preferred = await createDriveRole(drive.id, { title: 'Preferred' });
+    const other = await createDriveRole(drive.id, { title: 'Other' });
+    const application = await applyWithRoles(drive.id, student.token, [preferred.id]);
+
+    const res = await setStatus(application.body.id, admin.token, {
+      status: 'SELECTED',
+      selectedRoleId: other.id,
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('records the role on the application and placement, defaulting the package from it', async () => {
+    const { admin, student, drive, company } = await seedScenario();
+    const role = await createDriveRole(drive.id, { ctcAmount: 1500000 });
+    const application = await applyWithRoles(drive.id, student.token, [role.id]);
+
+    const res = await setStatus(application.body.id, admin.token, {
+      status: 'SELECTED',
+      selectedRoleId: role.id,
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.selectedRoleId, role.id);
+
+    const placements = await prisma.placement.findMany({ where: { companyId: company.id } });
+    assert.equal(placements.length, 1);
+    assert.equal(placements[0].driveRoleId, role.id);
+    assert.equal(Number(placements[0].packageAmount), 1500000);
+  });
+
+  test('an explicit packageAmount overrides the role default', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const role = await createDriveRole(drive.id, { ctcAmount: 1500000 });
+    const application = await applyWithRoles(drive.id, student.token, [role.id]);
+
+    await setStatus(application.body.id, admin.token, {
+      status: 'SELECTED',
+      selectedRoleId: role.id,
+      packageAmount: 2000000,
+    });
+
+    const placement = await prisma.placement.findFirst();
+    assert.equal(Number(placement.packageAmount), 2000000);
+  });
+
+  test('reversing a role-based selection clears selectedRoleId', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const role = await createDriveRole(drive.id);
+    const application = await applyWithRoles(drive.id, student.token, [role.id]);
+
+    await setStatus(application.body.id, admin.token, {
+      status: 'SELECTED',
+      selectedRoleId: role.id,
+    });
+    const reverted = await setStatus(application.body.id, admin.token, { status: 'SHORTLISTED' });
+
+    assert.equal(reverted.body.selectedRoleId, null);
+  });
+
+  test('a drive with no roles does not require selectedRoleId', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const application = await applyTo(drive.id, student.token);
+
+    const res = await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
+
+    assert.equal(res.status, 200);
   });
 });
 

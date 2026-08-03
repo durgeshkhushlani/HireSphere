@@ -7,6 +7,7 @@ async function applyToDrive(req, res) {
     studentProfileId: req.user.id,
     responses: req.body.responses,
     resumeUrl: req.body.resumeUrl,
+    rolePreferences: req.body.rolePreferences,
   });
   res.status(201).json(application);
 }

@@ -11,10 +11,12 @@ async function requireScoped(driveId, universityId) {
   return drive;
 }
 
+const ROLES_ORDER = { orderBy: { createdAt: 'asc' } };
+
 function listForUniversity(universityId) {
   return prisma.drive.findMany({
     where: { universityId },
-    include: { company: true },
+    include: { company: true, roles: ROLES_ORDER },
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -22,7 +24,7 @@ function listForUniversity(universityId) {
 async function getForUniversity(driveId, universityId) {
   const drive = await prisma.drive.findFirst({
     where: { id: driveId, universityId },
-    include: { company: true, eligiblePrograms: true },
+    include: { company: true, eligiblePrograms: true, roles: ROLES_ORDER },
   });
   if (!drive) throw ApiError.notFound('Drive not found');
   return drive;
@@ -130,6 +132,94 @@ async function setEligiblePrograms(driveId, universityId, programIds) {
   return getEligiblePrograms(drive.id, universityId);
 }
 
+const OFFER_TYPES = ['INTERNSHIP', 'JOB'];
+
+function validateRole(role) {
+  if (!role.title || !role.title.trim()) {
+    throw ApiError.badRequest('Each role needs a title');
+  }
+  if (!OFFER_TYPES.includes(role.offerType)) {
+    throw ApiError.badRequest(`offerType must be one of: ${OFFER_TYPES.join(', ')}`);
+  }
+  if (!role.description || !role.description.trim()) {
+    throw ApiError.badRequest('Each role needs a description (JD)');
+  }
+  if (role.offerType === 'JOB') {
+    if (role.ctcAmount == null) {
+      throw ApiError.badRequest('ctcAmount is required for a Job role');
+    }
+    if (role.stipendAmount != null) {
+      throw ApiError.badRequest('stipendAmount must not be set for a Job role');
+    }
+  } else {
+    if (role.stipendAmount == null) {
+      throw ApiError.badRequest('stipendAmount is required for an Internship role');
+    }
+    if (role.ctcAmount != null) {
+      throw ApiError.badRequest('ctcAmount must not be set for an Internship role');
+    }
+  }
+}
+
+// Full-replace, same shape as setApplicationForm/setEligiblePrograms: the
+// admin's roles page always submits the complete current set. Roles not
+// present in the incoming array are deleted — unless a student has already
+// preferenced one, in which case the whole request is rejected up front so
+// preference data is never silently orphaned.
+async function setRoles(driveId, universityId, roles) {
+  if (!Array.isArray(roles)) {
+    throw ApiError.badRequest('roles must be an array');
+  }
+  roles.forEach(validateRole);
+
+  const drive = await requireScoped(driveId, universityId);
+
+  const existingRoles = await prisma.driveRole.findMany({ where: { driveId: drive.id } });
+  const existingIds = new Set(existingRoles.map((r) => r.id));
+
+  for (const role of roles) {
+    if (role.id && !existingIds.has(role.id)) {
+      throw ApiError.badRequest('One or more role ids do not belong to this drive');
+    }
+  }
+
+  const incomingIds = new Set(roles.filter((r) => r.id).map((r) => r.id));
+  const toDelete = existingRoles.filter((r) => !incomingIds.has(r.id));
+
+  if (toDelete.length > 0) {
+    const preferenceCount = await prisma.applicationRolePreference.count({
+      where: { driveRoleId: { in: toDelete.map((r) => r.id) } },
+    });
+    if (preferenceCount > 0) {
+      throw ApiError.conflict(
+        'One or more roles being removed already have student applications against them — keep them instead of deleting'
+      );
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (toDelete.length > 0) {
+      await tx.driveRole.deleteMany({ where: { id: { in: toDelete.map((r) => r.id) } } });
+    }
+    for (const role of roles) {
+      const data = {
+        title: role.title.trim(),
+        offerType: role.offerType,
+        description: role.description.trim(),
+        ctcAmount: role.offerType === 'JOB' ? role.ctcAmount : null,
+        stipendAmount: role.offerType === 'INTERNSHIP' ? role.stipendAmount : null,
+      };
+      if (role.id) {
+        await tx.driveRole.update({ where: { id: role.id }, data });
+      } else {
+        await tx.driveRole.create({ data: { ...data, driveId: drive.id } });
+      }
+    }
+  });
+
+  return prisma.driveRole.findMany({ where: { driveId: drive.id }, ...ROLES_ORDER });
+}
+
 module.exports = {
   DRIVE_STATUSES,
   requireScoped,
@@ -141,4 +231,5 @@ module.exports = {
   setApplicationForm,
   getEligiblePrograms,
   setEligiblePrograms,
+  setRoles,
 };

@@ -11,6 +11,16 @@ const APPLICATION_STATUSES = [
   'NOT_SELECTED',
 ];
 
+// A student's ranked role preferences, plus whichever one they were finally
+// placed into (set by updateStatus when moving to SELECTED).
+const ROLE_PREFERENCES_INCLUDE = {
+  rolePreferences: {
+    include: { driveRole: true },
+    orderBy: { rank: 'asc' },
+  },
+  selectedRole: true,
+};
+
 const APPLICANT_INCLUDE = {
   studentProfile: {
     include: {
@@ -18,6 +28,7 @@ const APPLICANT_INCLUDE = {
       program: true,
     },
   },
+  ...ROLE_PREFERENCES_INCLUDE,
 };
 
 // Plan §4: eligibility is checked automatically against the student's stored
@@ -56,7 +67,14 @@ async function assertEligible(drive, studentProfileId) {
   }
 }
 
-async function applyToDrive({ driveId, universityId, studentProfileId, responses, resumeUrl }) {
+async function applyToDrive({
+  driveId,
+  universityId,
+  studentProfileId,
+  responses,
+  resumeUrl,
+  rolePreferences,
+}) {
   if (responses === undefined) {
     throw ApiError.badRequest('responses is required');
   }
@@ -68,9 +86,43 @@ async function applyToDrive({ driveId, universityId, studentProfileId, responses
 
   await assertEligible(drive, studentProfileId);
 
+  // Required only when the drive actually has roles defined — legacy drives
+  // with none skip this. But if rolePreferences is provided at all, it's
+  // always validated against this drive's actual roles (so a 0-role drive
+  // still rejects a stray id from some other drive, rather than silently
+  // ignoring it).
+  const roles = await prisma.driveRole.findMany({ where: { driveId: drive.id } });
+  if (roles.length > 0 && (!Array.isArray(rolePreferences) || rolePreferences.length === 0)) {
+    throw ApiError.badRequest('rolePreferences is required for this drive');
+  }
+  if (rolePreferences !== undefined) {
+    if (!Array.isArray(rolePreferences)) {
+      throw ApiError.badRequest('rolePreferences must be an array');
+    }
+    if (new Set(rolePreferences).size !== rolePreferences.length) {
+      throw ApiError.badRequest('rolePreferences cannot contain duplicates');
+    }
+    const roleIds = new Set(roles.map((r) => r.id));
+    if (rolePreferences.some((id) => !roleIds.has(id))) {
+      throw ApiError.badRequest('One or more rolePreferences do not belong to this drive');
+    }
+  }
+
   try {
-    return await prisma.application.create({
-      data: { driveId: drive.id, studentProfileId, responses, resumeUrl },
+    return await prisma.$transaction(async (tx) => {
+      const application = await tx.application.create({
+        data: { driveId: drive.id, studentProfileId, responses, resumeUrl },
+      });
+      if (Array.isArray(rolePreferences) && rolePreferences.length > 0) {
+        await tx.applicationRolePreference.createMany({
+          data: rolePreferences.map((driveRoleId, index) => ({
+            applicationId: application.id,
+            driveRoleId,
+            rank: index + 1,
+          })),
+        });
+      }
+      return application;
     });
   } catch (err) {
     if (err.code === 'P2002') throw ApiError.conflict('You have already applied to this drive');
@@ -91,7 +143,7 @@ async function listForDrive(driveId, universityId) {
 function listForStudent(studentProfileId) {
   return prisma.application.findMany({
     where: { studentProfileId },
-    include: { drive: { include: { company: true } } },
+    include: { drive: { include: { company: true } }, ...ROLE_PREFERENCES_INCLUDE },
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -101,7 +153,7 @@ function listForStudent(studentProfileId) {
 async function getForUser(id, user) {
   const application = await prisma.application.findUnique({
     where: { id },
-    include: { drive: { include: { company: true } } },
+    include: { drive: { include: { company: true } }, ...ROLE_PREFERENCES_INCLUDE },
   });
 
   if (!application || application.drive.universityId !== user.universityId) {
@@ -120,7 +172,7 @@ async function getForUser(id, user) {
 async function updateStatus(
   id,
   universityId,
-  { status, interviewSlot, interviewVenue, packageAmount }
+  { status, interviewSlot, interviewVenue, packageAmount, selectedRoleId }
 ) {
   if (!APPLICATION_STATUSES.includes(status)) {
     throw ApiError.badRequest(`status must be one of: ${APPLICATION_STATUSES.join(', ')}`);
@@ -128,7 +180,7 @@ async function updateStatus(
 
   const application = await prisma.application.findUnique({
     where: { id },
-    include: { drive: true },
+    include: { drive: true, rolePreferences: true },
   });
   if (!application || application.drive.universityId !== universityId) {
     throw ApiError.notFound('Application not found');
@@ -136,6 +188,22 @@ async function updateStatus(
 
   const wasSelected = application.status === 'SELECTED';
   const nowSelected = status === 'SELECTED';
+
+  // Only required when the applicant actually ranked roles — legacy
+  // drives/applications with none skip this and behave as before.
+  let resolvedRole = null;
+  if (nowSelected && !wasSelected && application.rolePreferences.length > 0) {
+    if (!selectedRoleId) {
+      throw ApiError.badRequest(
+        "selectedRoleId is required — pick one of the applicant's preferred roles"
+      );
+    }
+    const preferred = application.rolePreferences.some((p) => p.driveRoleId === selectedRoleId);
+    if (!preferred) {
+      throw ApiError.badRequest("selectedRoleId must be one of the applicant's preferred roles");
+    }
+    resolvedRole = await prisma.driveRole.findUnique({ where: { id: selectedRoleId } });
+  }
 
   // Status change, placement record and placement lock must move together —
   // a partial write here would either lock a student with no placement on
@@ -147,17 +215,27 @@ async function updateStatus(
         status,
         ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
         ...(interviewVenue !== undefined && { interviewVenue }),
+        ...(resolvedRole && { selectedRoleId: resolvedRole.id }),
+        ...(wasSelected && !nowSelected && { selectedRoleId: null }),
       },
     });
 
     if (nowSelected && !wasSelected) {
+      const defaultPackage = resolvedRole
+        ? resolvedRole.offerType === 'JOB'
+          ? resolvedRole.ctcAmount
+          : resolvedRole.stipendAmount
+        : undefined;
+      const packageAmountToSet = packageAmount !== undefined ? packageAmount : defaultPackage;
+
       await tx.placement.create({
         data: {
           universityId: application.drive.universityId,
           userId: application.studentProfileId,
           companyId: application.drive.companyId,
           driveId: application.drive.id,
-          ...(packageAmount !== undefined && { packageAmount }),
+          ...(resolvedRole && { driveRoleId: resolvedRole.id }),
+          ...(packageAmountToSet != null && { packageAmount: packageAmountToSet }),
         },
       });
       await tx.studentProfile.update({

@@ -93,6 +93,19 @@ function createDrive(universityId, companyId, overrides = {}) {
   });
 }
 
+function createDriveRole(driveId, overrides = {}) {
+  return prisma.driveRole.create({
+    data: {
+      driveId,
+      title: `Role ${unique()}`,
+      offerType: 'JOB',
+      description: 'Job description',
+      ctcAmount: 1200000,
+      ...overrides,
+    },
+  });
+}
+
 /** University + admin + student + company + one OPEN drive. */
 async function seedScenario({ drive: driveOverrides = {}, student: studentOverrides = {} } = {}) {
   const university = await createUniversity();
@@ -117,6 +130,7 @@ module.exports = {
   createCompany,
   createUniversityProgram,
   createDrive,
+  createDriveRole,
   requestAndVerifyOtp,
   registerAdmin,
   registerStudent,

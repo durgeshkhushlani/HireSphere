@@ -47,6 +47,15 @@ async function setEligiblePrograms(req, res) {
   res.json(programs);
 }
 
+async function setRoles(req, res) {
+  const roles = await drivesService.setRoles(
+    req.params.driveId,
+    req.user.universityId,
+    req.body.roles
+  );
+  res.json(roles);
+}
+
 module.exports = {
   list,
   getById,
@@ -56,4 +65,5 @@ module.exports = {
   setApplicationForm,
   getEligiblePrograms,
   setEligiblePrograms,
+  setRoles,
 };
