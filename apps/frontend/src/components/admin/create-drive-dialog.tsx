@@ -151,12 +151,12 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
 
           <div>
             <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-              Drive title
+              Drive name
             </Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Software Engineer"
+              placeholder="TechNova Systems — 2026 Hiring"
             />
           </div>
 

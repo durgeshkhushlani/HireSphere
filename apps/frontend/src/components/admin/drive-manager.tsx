@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -94,6 +96,11 @@ export function DriveManager() {
                   {drive.description && (
                     <p className="text-sm text-muted-foreground">{drive.description}</p>
                   )}
+                  <div className="text-xs text-muted-foreground">
+                    {drive.roles.length === 0
+                      ? "No roles added yet"
+                      : `${drive.roles.length} role${drive.roles.length === 1 ? "" : "s"}`}
+                  </div>
                   <div className="mt-auto flex items-center gap-2 pt-2">
                     <Select
                       value={drive.status}
@@ -112,6 +119,14 @@ export function DriveManager() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      nativeButton={false}
+                      render={<Link href={`/admin/drives/${drive.id}/roles`} />}
+                    >
+                      Roles
+                    </Button>
                     <ManageDriveDialog drive={drive} />
                   </div>
                 </CardContent>

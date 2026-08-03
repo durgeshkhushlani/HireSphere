@@ -1,6 +1,8 @@
 import { apiFetch } from "./client";
 import type { ApplicationStatus } from "@/lib/status";
-import type { Drive } from "./drives";
+import type { Drive, DriveRole } from "./drives";
+
+export type RolePreference = { rank: number; driveRole: DriveRole };
 
 export type Application = {
   id: string;
@@ -16,6 +18,8 @@ export type Application = {
   createdAt: string;
   updatedAt: string;
   drive: Drive;
+  rolePreferences: RolePreference[];
+  selectedRole: DriveRole | null;
 };
 
 export function listMyApplications(token: string) {
@@ -38,6 +42,8 @@ export type ApplicantEntry = {
     user: { id: string; name: string; email: string };
     program: { id: string; name: string };
   };
+  rolePreferences: RolePreference[];
+  selectedRole: DriveRole | null;
 };
 
 export function listApplicationsForDrive(driveId: string, token: string) {
@@ -46,7 +52,12 @@ export function listApplicationsForDrive(driveId: string, token: string) {
 
 export function updateApplicationStatus(
   id: string,
-  input: { status: ApplicationStatus; interviewSlot?: string; interviewVenue?: string },
+  input: {
+    status: ApplicationStatus;
+    interviewSlot?: string;
+    interviewVenue?: string;
+    selectedRoleId?: string;
+  },
   token: string
 ) {
   return apiFetch<ApplicantEntry>(`/applications/${id}/status`, {

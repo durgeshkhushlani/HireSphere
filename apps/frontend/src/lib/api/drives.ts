@@ -9,6 +9,29 @@ export type Company = {
   contactPhone: string | null;
 };
 
+export type OfferType = "INTERNSHIP" | "JOB";
+
+export type DriveRole = {
+  id: string;
+  driveId: string;
+  title: string;
+  offerType: OfferType;
+  description: string;
+  ctcAmount: string | null;
+  stipendAmount: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DriveRoleInput = {
+  id?: string;
+  title: string;
+  offerType: OfferType;
+  description: string;
+  ctcAmount?: number;
+  stipendAmount?: number;
+};
+
 export type Drive = {
   id: string;
   universityId: string;
@@ -21,6 +44,7 @@ export type Drive = {
   createdAt: string;
   updatedAt: string;
   company: Company;
+  roles: DriveRole[];
 };
 
 export type ApplicationFormQuestion = { id: string; label: string; type?: string };
@@ -30,13 +54,21 @@ export function listDrives(token: string) {
   return apiFetch<Drive[]>("/drives", { token });
 }
 
+export function getDrive(driveId: string, token: string) {
+  return apiFetch<Drive>(`/drives/${driveId}`, { token });
+}
+
 export function getApplicationForm(driveId: string, token: string) {
   return apiFetch<ApplicationForm>(`/drives/${driveId}/application-form`, { token });
 }
 
 export function applyToDrive(
   driveId: string,
-  input: { responses: Record<string, string>; resumeUrl?: string },
+  input: {
+    responses: Record<string, string>;
+    resumeUrl?: string;
+    rolePreferences?: string[];
+  },
   token: string
 ) {
   return apiFetch<{ id: string }>(`/drives/${driveId}/applications`, {
@@ -89,6 +121,14 @@ export function setEligiblePrograms(driveId: string, programIds: string[], token
   return apiFetch<{ id: string; name: string }[]>(`/drives/${driveId}/eligible-programs`, {
     method: "PUT",
     body: { programIds },
+    token,
+  });
+}
+
+export function setDriveRoles(driveId: string, roles: DriveRoleInput[], token: string) {
+  return apiFetch<DriveRole[]>(`/drives/${driveId}/roles`, {
+    method: "PUT",
+    body: { roles },
     token,
   });
 }

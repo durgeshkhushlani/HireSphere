@@ -26,7 +26,12 @@ import {
 import { APPLICATION_STATUS_OPTIONS, applicationStatusStyle, type ApplicationStatus } from "@/lib/status";
 import { ApplicantDetailDialog } from "./applicant-detail-dialog";
 
-type SavePatch = { status: ApplicationStatus; interviewSlot?: string; interviewVenue?: string };
+type SavePatch = {
+  status: ApplicationStatus;
+  interviewSlot?: string;
+  interviewVenue?: string;
+  selectedRoleId?: string;
+};
 
 export function ApplicantsPanel() {
   const { token } = useAuth();
@@ -234,11 +239,15 @@ function ApplicantRow({
     applicant.interviewSlot ? applicant.interviewSlot.slice(0, 16) : ""
   );
   const [interviewVenue, setInterviewVenue] = useState(applicant.interviewVenue ?? "");
+  const [selectedRoleId, setSelectedRoleId] = useState(applicant.selectedRole?.id ?? "");
 
   const dirty =
     status !== applicant.status ||
     interviewVenue !== (applicant.interviewVenue ?? "") ||
     interviewSlot !== (applicant.interviewSlot ? applicant.interviewSlot.slice(0, 16) : "");
+
+  const requiresRole = status === "SELECTED" && applicant.rolePreferences.length > 0;
+  const canSave = dirty && (!requiresRole || !!selectedRoleId);
 
   return (
     <Card size="sm">
@@ -256,6 +265,14 @@ function ApplicantRow({
           <div className="text-xs text-muted-foreground">
             {applicant.studentProfile.user.email} · {applicant.studentProfile.program.name}
           </div>
+          {applicant.rolePreferences.length > 0 && (
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Prefers:{" "}
+              {applicant.rolePreferences
+                .map((p) => `${p.rank}. ${p.driveRole.title}`)
+                .join(", ")}
+            </div>
+          )}
         </div>
 
         <Select
@@ -274,6 +291,24 @@ function ApplicantRow({
           </SelectContent>
         </Select>
 
+        {requiresRole && (
+          <Select
+            value={selectedRoleId}
+            onValueChange={(value) => value && setSelectedRoleId(value)}
+          >
+            <SelectTrigger size="sm" className="w-[160px] text-xs">
+              <SelectValue placeholder="Pick role" />
+            </SelectTrigger>
+            <SelectContent>
+              {applicant.rolePreferences.map((p) => (
+                <SelectItem key={p.driveRole.id} value={p.driveRole.id}>
+                  {p.driveRole.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <Input
           type="datetime-local"
           value={interviewSlot}
@@ -289,12 +324,13 @@ function ApplicantRow({
 
         <Button
           size="sm"
-          disabled={!dirty}
+          disabled={!canSave}
           onClick={() =>
             onSave(applicant, {
               status,
               interviewSlot: interviewSlot ? new Date(interviewSlot).toISOString() : undefined,
               interviewVenue: interviewVenue || undefined,
+              selectedRoleId: requiresRole ? selectedRoleId : undefined,
             })
           }
         >

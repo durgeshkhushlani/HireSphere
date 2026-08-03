@@ -39,6 +39,7 @@ export function ApplyDialog({
   const [questions, setQuestions] = useState<ApplicationFormQuestion[]>([]);
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [resumeUrl, setResumeUrl] = useState("");
+  const [rolePreferences, setRolePreferences] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleOpenChange(nextOpen: boolean) {
@@ -46,6 +47,7 @@ export function ApplyDialog({
     if (!nextOpen) {
       setResponses({});
       setResumeUrl("");
+      setRolePreferences([]);
       return;
     }
     if (!token) return;
@@ -64,8 +66,18 @@ export function ApplyDialog({
     }
   }
 
+  function toggleRole(roleId: string) {
+    setRolePreferences((prev) =>
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
+    );
+  }
+
   async function handleSubmit() {
     if (!token) return;
+    if (drive.roles.length > 0 && rolePreferences.length === 0) {
+      toast.error("Pick at least one role, in order of preference");
+      return;
+    }
     const missing = questions.find((q) => !responses[q.id]?.trim());
     if (missing) {
       toast.error(`Please answer: ${missing.label}`);
@@ -73,11 +85,20 @@ export function ApplyDialog({
     }
     setSubmitting(true);
     try {
-      await applyToDrive(drive.id, { responses, resumeUrl: resumeUrl || undefined }, token);
+      await applyToDrive(
+        drive.id,
+        {
+          responses,
+          resumeUrl: resumeUrl || undefined,
+          rolePreferences: drive.roles.length > 0 ? rolePreferences : undefined,
+        },
+        token
+      );
       toast.success(`Applied to ${drive.title} at ${drive.company.name}`);
       setOpen(false);
       setResponses({});
       setResumeUrl("");
+      setRolePreferences([]);
       onApplied();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't submit your application");
@@ -101,6 +122,35 @@ export function ApplyDialog({
           <p className="text-sm text-muted-foreground">Loading application form…</p>
         ) : (
           <div className="flex flex-col gap-4">
+            {drive.roles.length > 0 && (
+              <div>
+                <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                  Roles — click in order of preference
+                </Label>
+                <div className="flex flex-col gap-1.5">
+                  {drive.roles.map((role) => {
+                    const rank = rolePreferences.indexOf(role.id);
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => toggleRole(role.id)}
+                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                          rank >= 0 ? "border-primary bg-primary/5" : "border-border"
+                        }`}
+                      >
+                        <span className="font-semibold">{role.title}</span>
+                        {rank >= 0 && (
+                          <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                            {rank + 1}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {questions.map((q) => (
               <div key={q.id}>
                 <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">

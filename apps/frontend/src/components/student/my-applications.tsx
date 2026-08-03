@@ -34,6 +34,15 @@ export function MyApplications({ applications }: { applications: Application[] |
               <div>
                 <div className="text-sm font-bold">{app.drive.title}</div>
                 <div className="text-xs text-muted-foreground">{app.drive.company.name}</div>
+                {app.rolePreferences.length > 0 && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {app.selectedRole
+                      ? `Selected for: ${app.selectedRole.title}`
+                      : `Preferences: ${app.rolePreferences
+                          .map((p) => `${p.rank}. ${p.driveRole.title}`)
+                          .join(", ")}`}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-4">
                 {app.interviewSlot && (

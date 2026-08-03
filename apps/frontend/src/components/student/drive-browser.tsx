@@ -6,6 +6,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { driveStatusStyle } from "@/lib/status";
 import type { Drive } from "@/lib/api/drives";
 import { ApplyDialog } from "./apply-dialog";
+import { DriveDetailsDialog } from "./drive-details-dialog";
+
+function formatAmount(amount: string | null, suffix: string) {
+  if (amount == null) return null;
+  return `₹${Number(amount).toLocaleString("en-IN")}${suffix}`;
+}
+
+function RoleBadge({ drive }: { drive: Drive }) {
+  if (drive.roles.length === 0) return null;
+  if (drive.roles.length > 1) {
+    return (
+      <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">
+        Multiple roles
+      </span>
+    );
+  }
+  const role = drive.roles[0];
+  const amount =
+    role.offerType === "JOB"
+      ? formatAmount(role.ctcAmount, " CTC")
+      : formatAmount(role.stipendAmount, "/mo stipend");
+  return (
+    <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">
+      {role.offerType === "JOB" ? "Job" : "Internship"}
+      {amount ? ` · ${amount}` : ""}
+    </span>
+  );
+}
 
 export function DriveBrowser({
   drives,
@@ -66,6 +94,7 @@ export function DriveBrowser({
                 <p className="text-sm text-muted-foreground">{drive.description}</p>
               )}
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <RoleBadge drive={drive} />
                 {drive.minCgpa != null && (
                   <span className="rounded-full bg-muted px-2.5 py-1">
                     Min CGPA {drive.minCgpa}
@@ -77,7 +106,8 @@ export function DriveBrowser({
                   </span>
                 )}
               </div>
-              <div className="mt-auto pt-2">
+              <div className="mt-auto flex items-center gap-2 pt-2">
+                <DriveDetailsDialog drive={drive} />
                 {applied ? (
                   <span className="text-xs font-bold text-primary">Already applied</span>
                 ) : (
