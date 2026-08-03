@@ -34,6 +34,13 @@ enum ApplicationStatus {
   @@map("application_status")
 }
 
+enum OfferType {
+  INTERNSHIP
+  JOB
+
+  @@map("offer_type")
+}
+
 model University {
   id           String  @id @default(uuid())
   name         String
@@ -139,14 +146,56 @@ model Drive {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  university       University              @relation(fields: [universityId], references: [id])
-  company          Company                 @relation(fields: [companyId], references: [id])
+  university       University             @relation(fields: [universityId], references: [id])
+  company          Company                @relation(fields: [companyId], references: [id])
   eligiblePrograms DriveEligibleProgram[]
   applicationForm  ApplicationForm?
   applications     Application[]
   placements       Placement[]
+  roles            DriveRole[]
 
   @@map("drives")
+}
+
+// A drive can cover multiple openings (e.g. "SWE" and "Data Analyst" in the
+// same TechNova hiring round) — Drive.title is the campaign name, each role
+// here has its own title/JD/pay. ctcAmount/stipendAmount are both nullable at
+// the DB level; the "JOB needs ctcAmount, INTERNSHIP needs stipendAmount"
+// rule is enforced in the service layer, same as minCgpa/maxBacklogs.
+model DriveRole {
+  id            String    @id @default(uuid())
+  driveId       String    @map("drive_id")
+  title         String
+  offerType     OfferType @map("offer_type")
+  description   String
+  ctcAmount     Decimal?  @map("ctc_amount") @db.Decimal(10, 2)
+  stipendAmount Decimal?  @map("stipend_amount") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  drive                   Drive                       @relation(fields: [driveId], references: [id])
+  rolePreferences         ApplicationRolePreference[]
+  selectedForApplications Application[]               @relation("SelectedRole")
+  placements              Placement[]
+
+  @@map("drive_roles")
+}
+
+// A student's ranked role preferences for one application — 1 to however
+// many roles the drive has, most-preferred first (rank 1).
+model ApplicationRolePreference {
+  id            String @id @default(uuid())
+  applicationId String @map("application_id")
+  driveRoleId   String @map("drive_role_id")
+  rank          Int
+
+  application Application @relation(fields: [applicationId], references: [id])
+  driveRole   DriveRole   @relation(fields: [driveRoleId], references: [id])
+
+  @@unique([applicationId, driveRoleId])
+  @@unique([applicationId, rank])
+  @@map("application_role_preferences")
 }
 
 model DriveEligibleProgram {
@@ -183,6 +232,10 @@ model Application {
   interviewVenue   String?           @map("interview_venue")
   status           ApplicationStatus @default(APPLIED)
 
+  // Which of the student's preferred roles they're actually being placed
+  // into — set alongside the Placement record when status moves to SELECTED.
+  selectedRoleId String? @map("selected_role_id")
+
   // Resume delivery (plan §4): admin schedules a send time; the poller in
   // server.js dispatches it once resumeDispatchAt has passed. resumeSentAt
   // being non-null is the guard against a duplicate send.
@@ -192,8 +245,10 @@ model Application {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  drive          Drive          @relation(fields: [driveId], references: [id])
-  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [userId])
+  drive           Drive                       @relation(fields: [driveId], references: [id])
+  studentProfile  StudentProfile              @relation(fields: [studentProfileId], references: [userId])
+  selectedRole    DriveRole?                  @relation("SelectedRole", fields: [selectedRoleId], references: [id])
+  rolePreferences ApplicationRolePreference[]
 
   @@unique([driveId, studentProfileId])
   @@map("applications")
@@ -217,6 +272,7 @@ model Placement {
   userId        String   @map("user_id")
   companyId     String   @map("company_id")
   driveId       String?  @map("drive_id")
+  driveRoleId   String?  @map("drive_role_id")
   packageAmount Decimal? @map("package_amount") @db.Decimal(10, 2)
 
   placedAt DateTime @default(now()) @map("placed_at")
@@ -225,6 +281,7 @@ model Placement {
   user       User       @relation(fields: [userId], references: [id])
   company    Company    @relation(fields: [companyId], references: [id])
   drive      Drive?     @relation(fields: [driveId], references: [id])
+  driveRole  DriveRole? @relation(fields: [driveRoleId], references: [id])
 
   @@map("placements")
 }
