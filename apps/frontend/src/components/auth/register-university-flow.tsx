@@ -46,7 +46,7 @@ export function RegisterUniversityFlow() {
 
   if (submitted) {
     return (
-      <div className="flex min-h-full items-center justify-center p-8">
+      <div className="flex min-h-full flex-1 items-center justify-center p-8">
         <div className="w-full max-w-md text-center">
           <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-full bg-primary/10">
             <CheckCircle2 className="size-7 text-primary" />
@@ -69,7 +69,7 @@ export function RegisterUniversityFlow() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center p-8 sm:p-12">
+    <div className="flex min-h-full flex-1 items-center justify-center p-8 sm:p-12">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-8 flex items-center gap-2.5">
           <Image src="/brand/icon.png" alt="" width={32} height={32} className="rounded-[9px]" />

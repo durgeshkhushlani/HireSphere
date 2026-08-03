@@ -17,6 +17,10 @@ export function listUniversities() {
   return apiFetch<University[]>("/universities");
 }
 
+export function listPendingUniversities() {
+  return apiFetch<University[]>("/universities/pending");
+}
+
 export function createUniversity(input: {
   name: string;
   domain: string;

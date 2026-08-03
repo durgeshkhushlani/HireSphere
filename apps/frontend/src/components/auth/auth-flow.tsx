@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OtpInput } from "@/components/auth/otp-input";
+import { VerifyUniversityCheck } from "@/components/auth/verify-university";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import * as authApi from "@/lib/api/auth";
@@ -199,7 +200,7 @@ export function AuthFlow({
   }
 
   return (
-    <div className="flex min-h-full">
+    <div className="flex min-h-full flex-1">
       <div className="relative hidden w-[42%] flex-col items-center justify-center overflow-hidden border-r bg-muted/60 p-14 lg:flex">
         <div
           className="absolute inset-0"
@@ -268,6 +269,12 @@ export function AuthFlow({
                   >
                     Placement Admin
                   </button>
+                </div>
+              )}
+
+              {mode === "signup" && step === "form" && (
+                <div className="mt-4">
+                  <VerifyUniversityCheck />
                 </div>
               )}
             </div>
