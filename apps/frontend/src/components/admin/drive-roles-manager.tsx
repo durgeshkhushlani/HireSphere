@@ -224,6 +224,7 @@ export function DriveRolesManager({ driveId }: { driveId: string }) {
                       min={0}
                       value={d.amount}
                       onChange={(e) => updateDraft(d.key, { amount: e.target.value })}
+                      onWheel={(e) => e.currentTarget.blur()}
                       placeholder={d.offerType === "JOB" ? "1200000" : "25000"}
                     />
                   </div>

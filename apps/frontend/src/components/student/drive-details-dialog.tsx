@@ -52,7 +52,9 @@ export function DriveDetailsDialog({ drive }: { drive: Drive }) {
                   onValueChange={(value) => value && setSelectedRoleId(value)}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: string) => drive.roles.find((r) => r.id === value)?.title}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {drive.roles.map((r) => (
