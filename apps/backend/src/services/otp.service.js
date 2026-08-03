@@ -61,11 +61,15 @@ async function requestOtp(email) {
     create: { email, codeHash, expiresAt: new Date(Date.now() + CODE_TTL_MS) },
   });
 
-  await mailer.sendMail({
-    to: email,
-    subject: 'Your HireSphere verification code',
-    text: `Your verification code is ${code}. It expires in 10 minutes.`,
-  });
+  try {
+    await mailer.sendMail({
+      to: email,
+      subject: 'Your HireSphere verification code',
+      text: `Your verification code is ${code}. It expires in 10 minutes.`,
+    });
+  } catch (err) {
+    throw ApiError.badGateway(`Could not send the verification email: ${err.message}`);
+  }
 
   return { message: 'Verification code sent' };
 }

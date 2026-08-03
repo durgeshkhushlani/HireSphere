@@ -18,6 +18,14 @@ function buildTransport() {
 const transport = buildTransport();
 
 async function sendMail({ to, subject, text }) {
+  // Fail fast with a normal, catchable rejection instead of letting
+  // nodemailer attempt the Gmail connection: an auth failure there surfaces
+  // as an unhandled error event on the underlying SMTP socket rather than a
+  // clean promise rejection, so it bypasses a caller's try/catch entirely.
+  if (process.env.NODE_ENV !== 'test' && (!process.env.SMTP_USER || !process.env.SMTP_PASS)) {
+    throw new Error('Email sending is not configured (SMTP_USER/SMTP_PASS missing)');
+  }
+
   const info = await transport.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
