@@ -26,6 +26,15 @@ async function registerAdmin({ verificationToken, email, password, name }) {
   // universityId is derived from the OTP-verified token, never accepted
   // directly from the client — see otp.service.js.
   const universityId = otpService.resolveRegistration(verificationToken, email);
+
+  // One admin per university for v1 — a second registration attempt should
+  // fail clearly rather than silently creating a co-admin with no UI to
+  // manage that yet.
+  const existingAdmin = await prisma.user.findFirst({ where: { universityId, role: 'ADMIN' } });
+  if (existingAdmin) {
+    throw ApiError.conflict('This university already has a placement admin account');
+  }
+
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   try {

@@ -84,6 +84,33 @@ describe('POST /api/auth/register/admin', () => {
     assert.equal(res.status, 400);
   });
 
+  test('rejects a second admin for the same university with 409', async () => {
+    const university = await createUniversity();
+    await registerAdmin(university.id);
+
+    const email = `second-admin-${Date.now()}@${university.domain}`;
+    const verificationToken = await requestAndVerifyOtp(email);
+    const res = await api().post('/api/auth/register/admin').send({
+      verificationToken,
+      email,
+      password: 'secret123',
+      name: 'Second Admin',
+    });
+
+    assert.equal(res.status, 409);
+  });
+
+  test('allows admins at two different universities', async () => {
+    const universityA = await createUniversity();
+    const universityB = await createUniversity();
+
+    const first = await registerAdmin(universityA.id);
+    const second = await registerAdmin(universityB.id);
+
+    assert.equal(first.res.status, 201);
+    assert.equal(second.res.status, 201);
+  });
+
   test('rejects a verificationToken issued for a different email with 400', async () => {
     const university = await createUniversity();
     const email = `owner-${Date.now()}@${university.domain}`;

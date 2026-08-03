@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,12 @@ import { listUniversities, listUniversityPrograms, type Program } from "@/lib/ap
 type Mode = "login" | "signup";
 type Role = "student" | "admin";
 type Step = "form" | "academic" | "otp";
+
+const BRAND_POINTS = [
+  "Apply only to drives you're actually eligible for",
+  "Track every application, applied to placed",
+  "One login for the whole placement season",
+];
 
 export function AuthFlow({
   initialMode,
@@ -80,8 +87,21 @@ export function AuthFlow({
     const universities = await listUniversities();
     const match = universities.find((u) => u.domain.toLowerCase() === domain);
     if (!match) {
+      if (role === "admin") {
+        toast.error(
+          "We couldn't find a verified university for that domain yet. Register your university to get started.",
+          { action: { label: "Register", onClick: () => router.push("/register-university") } }
+        );
+      } else {
+        toast.error(
+          "We couldn't find a verified university for that email domain. Ask your placement cell to register your university first."
+        );
+      }
+      return null;
+    }
+    if (role === "admin" && match.hasAdmin) {
       toast.error(
-        "We couldn't find a verified university for that email domain. Ask your placement cell to register your university first."
+        "This university already has a placement admin account. Log in instead, or ask them to be added."
       );
       return null;
     }
@@ -180,56 +200,58 @@ export function AuthFlow({
 
   return (
     <div className="flex min-h-full">
-      <div className="hidden w-[42%] flex-col justify-between border-r bg-muted/60 p-14 lg:flex">
-        <div className="flex flex-1 flex-col justify-center">
-          <Image
-            src="/brand/student-illustration.png"
-            alt=""
-            width={140}
-            height={170}
-            className="object-contain"
-          />
-          <p className="mt-4 max-w-xs text-xl font-bold leading-tight">
+      <div className="relative hidden w-[42%] flex-col items-center justify-center overflow-hidden border-r bg-muted/60 p-14 lg:flex">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "radial-gradient(oklch(0.93 0.02 195) 1.5px, transparent 1.5px)",
+            backgroundSize: "26px 26px",
+          }}
+        />
+        <div className="relative flex w-full max-w-xs flex-col items-center text-center">
+          <Link href="/" className="flex items-center gap-2.5">
+            <Image src="/brand/icon.png" alt="" width={40} height={40} className="rounded-[10px]" />
+            <span className="font-heading text-xl font-extrabold">HireSphere</span>
+          </Link>
+
+          <h2 className="mt-8 text-balance font-heading text-2xl font-extrabold tracking-tight">
             Every drive, one place.
-            <br />
-            Zero spreadsheets.
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Zero spreadsheets. Track every application from applied to placed.
           </p>
+
+          <ul className="mt-8 flex w-full flex-col gap-3 text-left text-sm">
+            {BRAND_POINTS.map((line) => (
+              <li key={line} className="flex items-center gap-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                <span className="text-foreground/90">{line}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <Link href="/" className="flex items-center gap-2.5">
-          <Image src="/brand/icon.png" alt="" width={32} height={32} className="rounded-[9px]" />
-          <span className="font-heading text-lg font-extrabold">HireSphere</span>
-        </Link>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-8 sm:p-12">
         <div className="w-full max-w-[420px]">
-          {step !== "otp" && (
-            <>
-              <div className="mb-6 flex gap-6 border-b">
-                <button
-                  onClick={() => switchMode("login")}
-                  className={`-mb-px border-b-2 pb-2.5 text-[15px] font-bold ${
-                    mode === "login"
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground"
-                  }`}
-                >
-                  Log in
-                </button>
-                <button
-                  onClick={() => switchMode("signup")}
-                  className={`-mb-px border-b-2 pb-2.5 text-[15px] font-bold ${
-                    mode === "signup"
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground"
-                  }`}
-                >
-                  Sign up
-                </button>
-              </div>
+          <Link href="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
+            <Image src="/brand/icon.png" alt="" width={32} height={32} className="rounded-[9px]" />
+            <span className="font-heading text-lg font-extrabold">HireSphere</span>
+          </Link>
+
+          {(step === "form" || step === "academic") && (
+            <div className="mb-6">
+              <h1 className="font-heading text-2xl font-extrabold tracking-tight">
+                {mode === "login" ? "Welcome back" : "Create your account"}
+              </h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {mode === "login"
+                  ? "Log in to track your drives and applications."
+                  : "Takes a couple of minutes to get started."}
+              </p>
 
               {mode === "signup" && step === "form" && (
-                <div className="mb-6 flex gap-2 rounded-lg bg-muted p-1">
+                <div className="mt-6 flex gap-2 rounded-lg bg-muted p-1">
                   <button
                     onClick={() => setRole("student")}
                     className={`flex-1 rounded-md py-2 text-sm font-bold ${
@@ -248,7 +270,7 @@ export function AuthFlow({
                   </button>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {mode === "login" && (
@@ -375,6 +397,34 @@ export function AuthFlow({
                 ← Back
               </button>
             </form>
+          )}
+
+          {(step === "form" || step === "academic") && (
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              {mode === "login" ? (
+                <>
+                  New to HireSphere?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signup")}
+                    className="font-semibold text-primary"
+                  >
+                    Create an account
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("login")}
+                    className="font-semibold text-primary"
+                  >
+                    Log in
+                  </button>
+                </>
+              )}
+            </p>
           )}
 
           {step === "otp" && (
