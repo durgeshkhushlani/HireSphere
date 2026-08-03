@@ -139,7 +139,12 @@ export function ApplicantsPanel() {
         <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">Drive</Label>
         <Select value={selectedDriveId} onValueChange={(value) => setSelectedDriveId(value ?? "")}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select a drive" />
+            <SelectValue placeholder="Select a drive">
+              {(value: string) => {
+                const d = drives.find((drive) => drive.id === value);
+                return d ? `${d.title} — ${d.company.name}` : null;
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {drives.map((d) => (
@@ -297,7 +302,11 @@ function ApplicantRow({
             onValueChange={(value) => value && setSelectedRoleId(value)}
           >
             <SelectTrigger size="sm" className="w-[160px] text-xs">
-              <SelectValue placeholder="Pick role" />
+              <SelectValue placeholder="Pick role">
+                {(value: string) =>
+                  applicant.rolePreferences.find((p) => p.driveRole.id === value)?.driveRole.title
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {applicant.rolePreferences.map((p) => (
