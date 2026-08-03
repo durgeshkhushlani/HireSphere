@@ -3,8 +3,19 @@ const ApiError = require('../lib/ApiError');
 
 // Only verified universities are publicly discoverable — this list backs
 // pre-registration dropdowns, and an unverified entry isn't real yet.
-function list() {
-  return prisma.university.findMany({ where: { verified: true } });
+// `hasAdmin` lets the signup form reject a second admin registration for a
+// university up front (before OTP is even sent), instead of only failing at
+// the final register step — see auth.service.js's one-admin-per-university
+// rule.
+async function list() {
+  const universities = await prisma.university.findMany({
+    where: { verified: true },
+    include: { _count: { select: { users: { where: { role: 'ADMIN' } } } } },
+  });
+  return universities.map(({ _count, ...university }) => ({
+    ...university,
+    hasAdmin: _count.users > 0,
+  }));
 }
 
 // Requests waiting on the manual verification step (plan §3). Not gated
@@ -22,6 +33,17 @@ async function create({ name, domain, contactName, contactEmail }) {
   if (!name || !domain || !contactName || !contactEmail) {
     throw ApiError.badRequest('name, domain, contactName and contactEmail are required');
   }
+
+  // Cheap sanity check, not real domain ownership proof (that's what the
+  // manual video-call/DNS TXT verification step is for) — but it stops the
+  // obvious case of registering someone else's domain with a throwaway
+  // contact address. Whoever submits this must at least hold an address on
+  // the domain they're claiming.
+  const contactDomain = contactEmail.split('@')[1]?.toLowerCase();
+  if (contactDomain !== domain.toLowerCase()) {
+    throw ApiError.badRequest('Contact email must be at the same domain you are registering');
+  }
+
   try {
     return await prisma.university.create({ data: { name, domain, contactName, contactEmail } });
   } catch (err) {

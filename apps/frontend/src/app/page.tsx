@@ -94,7 +94,7 @@ export default function HomePage() {
               </p>
             </Link>
             <Link
-              href="/auth?mode=signup&role=admin"
+              href="/register-university"
               className="w-full max-w-[300px] rounded-2xl border bg-card p-8 text-center shadow-sm transition-colors hover:border-primary"
             >
               <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
@@ -153,7 +153,7 @@ export default function HomePage() {
             <Button
               className="mt-8 bg-accent text-accent-foreground hover:bg-accent/90"
               nativeButton={false}
-              render={<Link href="/auth?mode=signup&role=admin" />}
+              render={<Link href="/register-university" />}
             >
               Register your university <ArrowRight className="size-4" />
             </Button>
