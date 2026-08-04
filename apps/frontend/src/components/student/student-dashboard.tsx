@@ -12,6 +12,9 @@ import { DriveBrowser } from "./drive-browser";
 import { MyApplications } from "./my-applications";
 import { PlacementBanner } from "./placement-banner";
 
+const TAB_TRIGGER_CLASS =
+  "rounded-full border border-border bg-card px-4 shadow-sm data-active:border-transparent data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-foreground dark:data-active:text-background dark:data-active:hover:text-background";
+
 export function StudentDashboard() {
   const { token } = useAuth();
   const [drives, setDrives] = useState<Drive[] | null>(null);
@@ -50,9 +53,9 @@ export function StudentDashboard() {
       </p>
 
       <Tabs defaultValue="drives" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="drives">Browse Drives</TabsTrigger>
-          <TabsTrigger value="applications">
+        <TabsList className="gap-2 bg-transparent p-0">
+          <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Browse Drives</TabsTrigger>
+          <TabsTrigger value="applications" className={TAB_TRIGGER_CLASS}>
             My Applications{applications ? ` (${applications.length})` : ""}
           </TabsTrigger>
         </TabsList>

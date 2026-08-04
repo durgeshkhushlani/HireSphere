@@ -8,6 +8,9 @@ import { ProgramsManager } from "./programs-manager";
 import { CompaniesManager } from "./companies-manager";
 import { StudentsManager } from "./students-manager";
 
+const TAB_TRIGGER_CLASS =
+  "rounded-full border border-border bg-card px-4 shadow-sm data-active:border-transparent data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-foreground dark:data-active:text-background dark:data-active:hover:text-background";
+
 export function AdminDashboard() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 sm:px-8">
@@ -17,13 +20,13 @@ export function AdminDashboard() {
       </p>
 
       <Tabs defaultValue="drives" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="drives">Drives</TabsTrigger>
-          <TabsTrigger value="applicants">Applicants</TabsTrigger>
-          <TabsTrigger value="placements">Placements</TabsTrigger>
-          <TabsTrigger value="programs">Programs</TabsTrigger>
-          <TabsTrigger value="companies">Companies</TabsTrigger>
-          <TabsTrigger value="students">Students</TabsTrigger>
+        <TabsList className="gap-2 bg-transparent p-0">
+          <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Drives</TabsTrigger>
+          <TabsTrigger value="applicants" className={TAB_TRIGGER_CLASS}>Applicants</TabsTrigger>
+          <TabsTrigger value="placements" className={TAB_TRIGGER_CLASS}>Placements</TabsTrigger>
+          <TabsTrigger value="programs" className={TAB_TRIGGER_CLASS}>Programs</TabsTrigger>
+          <TabsTrigger value="companies" className={TAB_TRIGGER_CLASS}>Companies</TabsTrigger>
+          <TabsTrigger value="students" className={TAB_TRIGGER_CLASS}>Students</TabsTrigger>
         </TabsList>
         <TabsContent value="drives" className="mt-6">
           <DriveManager />
