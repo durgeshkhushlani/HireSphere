@@ -55,6 +55,30 @@ async function create({ companyId, title, description, minCgpa, maxBacklogs }, u
   }
 }
 
+// title/description/minCgpa/maxBacklogs were previously only settable at
+// creation — there was no way to edit them afterward at all.
+async function updateDetails(driveId, universityId, { title, description, minCgpa, maxBacklogs }) {
+  await requireScoped(driveId, universityId);
+
+  if (title !== undefined && !title.trim()) {
+    throw ApiError.badRequest('title cannot be empty');
+  }
+  if (maxBacklogs !== undefined && maxBacklogs !== null && maxBacklogs < 0) {
+    throw ApiError.badRequest('maxBacklogs cannot be negative');
+  }
+
+  return prisma.drive.update({
+    where: { id: driveId },
+    data: {
+      ...(title !== undefined && { title: title.trim() }),
+      ...(description !== undefined && { description }),
+      ...(minCgpa !== undefined && { minCgpa }),
+      ...(maxBacklogs !== undefined && { maxBacklogs }),
+    },
+    include: { company: true, eligiblePrograms: true, roles: ROLES_ORDER },
+  });
+}
+
 async function updateStatus(driveId, universityId, status) {
   if (!DRIVE_STATUSES.includes(status)) {
     throw ApiError.badRequest(`status must be one of: ${DRIVE_STATUSES.join(', ')}`);
@@ -226,6 +250,7 @@ module.exports = {
   listForUniversity,
   getForUniversity,
   create,
+  updateDetails,
   updateStatus,
   getApplicationForm,
   setApplicationForm,

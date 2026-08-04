@@ -1,10 +1,10 @@
-import { DriveRolesManager } from "@/components/admin/drive-roles-manager";
+import { DriveDetailsManager } from "@/components/admin/drive-details-manager";
 
-export default async function DriveRolesPage({
+export default async function DriveDetailsPage({
   params,
 }: {
   params: Promise<{ driveId: string }>;
 }) {
   const { driveId } = await params;
-  return <DriveRolesManager driveId={driveId} />;
+  return <DriveDetailsManager driveId={driveId} />;
 }

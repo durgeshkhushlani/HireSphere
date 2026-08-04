@@ -11,6 +11,7 @@ router.use(requireAuth);
 router.get('/', drivesController.list);
 router.get('/:id', drivesController.getById);
 router.post('/', requireRole('ADMIN'), drivesController.create);
+router.patch('/:id/details', requireRole('ADMIN'), drivesController.updateDetails);
 router.patch('/:id/status', requireRole('ADMIN'), drivesController.updateStatus);
 
 // Per-drive application form (the question set students answer).

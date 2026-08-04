@@ -25,12 +25,13 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { listCompanies, createCompany, type Company } from "@/lib/api/companies";
-import { createDrive } from "@/lib/api/drives";
+import { listUniversityPrograms, type Program } from "@/lib/api/universities";
+import { createDrive, setEligiblePrograms } from "@/lib/api/drives";
 
 const NEW_COMPANY = "__new__";
 
 export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [open, setOpen] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState("");
@@ -39,6 +40,8 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
   const [description, setDescription] = useState("");
   const [minCgpa, setMinCgpa] = useState("");
   const [maxBacklogs, setMaxBacklogs] = useState("");
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [eligibleIds, setEligibleIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
 
   function reset() {
@@ -48,13 +51,28 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
     setDescription("");
     setMinCgpa("");
     setMaxBacklogs("");
+    setEligibleIds(new Set());
+  }
+
+  function toggleProgram(id: string) {
+    setEligibleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   async function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
-    if (!nextOpen || !token) return;
+    if (!nextOpen || !token || !user) return;
     try {
-      setCompanies(await listCompanies(token));
+      const [companyList, programList] = await Promise.all([
+        listCompanies(token),
+        listUniversityPrograms(user.universityId),
+      ]);
+      setCompanies(companyList);
+      setPrograms(programList);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't load companies");
     }
@@ -86,7 +104,7 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
     try {
       const resolvedCompanyId = await resolveCompanyId();
       if (!resolvedCompanyId) return;
-      await createDrive(
+      const drive = await createDrive(
         {
           companyId: resolvedCompanyId,
           title: title.trim(),
@@ -96,6 +114,9 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
         },
         token
       );
+      if (eligibleIds.size > 0) {
+        await setEligiblePrograms(drive.id, [...eligibleIds], token);
+      }
       toast.success(`${title} created`);
       setOpen(false);
       reset();
@@ -118,12 +139,18 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
           <div>
             <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">Company</Label>
             <Select value={companyId} onValueChange={(value) => setCompanyId(value ?? "")}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a company" />
+                <SelectValue placeholder="Select a company">
+                  {(value: string) =>
+                    value === NEW_COMPANY
+                      ? "+ Add a new company"
+                      : (companies.find((c) => c.id === value)?.name ?? null)
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {companies.map((c) => (
@@ -194,6 +221,35 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
                 placeholder="Optional"
               />
             </div>
+          </div>
+
+          <div>
+            <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
+              Eligible programs
+            </Label>
+            {programs.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Your university hasn&apos;t added any programs yet.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Leave all unchecked to open this drive to every program — students from other
+                  branches will still see the drive, but can&apos;t apply.
+                </p>
+                {programs.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={eligibleIds.has(p.id)}
+                      onChange={() => toggleProgram(p.id)}
+                      className="size-4 rounded border-input"
+                    />
+                    {p.name}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

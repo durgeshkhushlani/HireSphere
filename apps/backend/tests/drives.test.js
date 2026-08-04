@@ -170,6 +170,55 @@ describe('PATCH /api/drives/:id/status', () => {
   });
 });
 
+describe('PATCH /api/drives/:id/details', () => {
+  test('lets an admin edit title/description/eligibility after creation', async () => {
+    const { admin, drive } = await seedScenario();
+
+    const res = await api()
+      .patch(`/api/drives/${drive.id}/details`)
+      .set(...auth(admin.token))
+      .send({ title: 'Updated Title', description: 'New description', minCgpa: 7.5, maxBacklogs: 1 });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.title, 'Updated Title');
+    assert.equal(res.body.description, 'New description');
+    assert.equal(Number(res.body.minCgpa), 7.5);
+    assert.equal(res.body.maxBacklogs, 1);
+  });
+
+  test('rejects a blank title with 400', async () => {
+    const { admin, drive } = await seedScenario();
+    const res = await api()
+      .patch(`/api/drives/${drive.id}/details`)
+      .set(...auth(admin.token))
+      .send({ title: '   ' });
+    assert.equal(res.status, 400);
+  });
+
+  test('forbids a student', async () => {
+    const { student, drive } = await seedScenario();
+    const res = await api()
+      .patch(`/api/drives/${drive.id}/details`)
+      .set(...auth(student.token))
+      .send({ title: 'Nope' });
+    assert.equal(res.status, 403);
+  });
+
+  test('cannot change a drive belonging to another university', async () => {
+    const { admin } = await seedScenario();
+    const other = await createUniversity();
+    const otherCompany = await createCompany();
+    const foreignDrive = await createDrive(other.id, otherCompany.id, { status: 'DRAFT' });
+
+    const res = await api()
+      .patch(`/api/drives/${foreignDrive.id}/details`)
+      .set(...auth(admin.token))
+      .send({ title: 'Hijacked' });
+
+    assert.equal(res.status, 404);
+  });
+});
+
 describe('application form', () => {
   test('admin sets it and a student can read it', async () => {
     const { admin, student, drive } = await seedScenario();

@@ -99,6 +99,18 @@ export function updateDriveStatus(driveId: string, status: DriveStatus, token: s
   });
 }
 
+export function updateDriveDetails(
+  driveId: string,
+  input: { title?: string; description?: string; minCgpa?: number | null; maxBacklogs?: number | null },
+  token: string
+) {
+  return apiFetch<Drive>(`/drives/${driveId}/details`, {
+    method: "PATCH",
+    body: input,
+    token,
+  });
+}
+
 export function setApplicationForm(
   driveId: string,
   questions: ApplicationFormQuestion[],

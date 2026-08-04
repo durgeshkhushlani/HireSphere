@@ -12,6 +12,11 @@ async function create(req, res) {
   res.status(201).json(await drivesService.create(req.body, req.user.universityId));
 }
 
+async function updateDetails(req, res) {
+  const drive = await drivesService.updateDetails(req.params.id, req.user.universityId, req.body);
+  res.json(drive);
+}
+
 async function updateStatus(req, res) {
   const drive = await drivesService.updateStatus(
     req.params.id,
@@ -60,6 +65,7 @@ module.exports = {
   list,
   getById,
   create,
+  updateDetails,
   updateStatus,
   getApplicationForm,
   setApplicationForm,

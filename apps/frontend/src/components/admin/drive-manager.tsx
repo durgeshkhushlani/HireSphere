@@ -19,7 +19,6 @@ import { ApiError } from "@/lib/api/client";
 import { listDrives, updateDriveStatus, type Drive } from "@/lib/api/drives";
 import { driveStatusStyle, type DriveStatus } from "@/lib/status";
 import { CreateDriveDialog } from "./create-drive-dialog";
-import { ManageDriveDialog } from "./manage-drive-dialog";
 
 const STATUS_OPTIONS: DriveStatus[] = ["DRAFT", "OPEN", "CLOSED"];
 
@@ -125,9 +124,8 @@ export function DriveManager() {
                       nativeButton={false}
                       render={<Link href={`/admin/drives/${drive.id}/roles`} />}
                     >
-                      Roles
+                      Details
                     </Button>
-                    <ManageDriveDialog drive={drive} />
                   </div>
                 </CardContent>
               </Card>
