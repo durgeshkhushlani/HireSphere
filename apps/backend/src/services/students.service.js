@@ -134,7 +134,6 @@ async function updateProfile(userId, patch) {
     if (patch[key] !== undefined) data[key] = patch[key];
   }
 
-  let definitions = [];
   if (patch.customFieldValues !== undefined) {
     if (
       typeof patch.customFieldValues !== 'object' ||
@@ -144,7 +143,7 @@ async function updateProfile(userId, patch) {
       throw ApiError.badRequest('customFieldValues must be an object keyed by field id');
     }
 
-    definitions = await prisma.studentCustomFieldDefinition.findMany({
+    const definitions = await prisma.studentCustomFieldDefinition.findMany({
       where: { universityId: profile.user.universityId },
     });
     const defById = new Map(definitions.map((d) => [d.id, d]));
