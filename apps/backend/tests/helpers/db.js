@@ -11,6 +11,8 @@ const TABLES = [
   'drive_eligible_programs',
   'drive_roles',
   'drives',
+  'student_custom_field_values',
+  'student_custom_field_definitions',
   'student_profiles',
   'users',
   'university_programs',

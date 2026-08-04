@@ -9,6 +9,7 @@ const placementsRouter = require('./routes/placements.routes');
 const programsRouter = require('./routes/programs.routes');
 const universityProgramsRouter = require('./routes/university-programs.routes');
 const chatRouter = require('./routes/chat.routes');
+const studentsRouter = require('./routes/students.routes');
 const ApiError = require('./lib/ApiError');
 
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/placements', placementsRouter);
 app.use('/api/programs', programsRouter);
 app.use('/api/university-programs', universityProgramsRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/students', studentsRouter);
 
 // Express 5 forwards rejected promises from async handlers here automatically,
 // so controllers don't need their own try/catch.

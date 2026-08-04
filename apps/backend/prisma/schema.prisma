@@ -41,6 +41,15 @@ enum OfferType {
   @@map("offer_type")
 }
 
+enum StudentFieldType {
+  TEXT
+  NUMBER
+  DROPDOWN
+  DATE
+
+  @@map("student_field_type")
+}
+
 model University {
   id           String  @id @default(uuid())
   name         String
@@ -52,10 +61,11 @@ model University {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users              User[]
-  universityPrograms UniversityProgram[]
-  drives             Drive[]
-  placements         Placement[]
+  users                          User[]
+  universityPrograms              UniversityProgram[]
+  drives                          Drive[]
+  placements                      Placement[]
+  studentCustomFieldDefinitions   StudentCustomFieldDefinition[]
 
   @@map("universities")
 }
@@ -109,11 +119,55 @@ model StudentProfile {
   backlogCount    Int     @default(0) @map("backlog_count")
   placementLocked Boolean @default(false) @map("placement_locked")
 
-  user         User          @relation(fields: [userId], references: [id])
-  program      Program       @relation(fields: [programId], references: [id])
-  applications Application[]
+  // Profile fields the student fills in themselves, editable freely until an
+  // admin verifies the profile — once verified, only address/phone stay
+  // editable (enforced in students.service.js, same "null = not set, checked
+  // where written" convention as the rest of this schema).
+  tenthPercentage   Decimal? @map("tenth_percentage") @db.Decimal(5, 2)
+  twelfthPercentage Decimal? @map("twelfth_percentage") @db.Decimal(5, 2)
+  bloodGroup        String?  @map("blood_group")
+  address           String?
+  phone             String?
+  verified          Boolean  @default(false)
+
+  user              User                       @relation(fields: [userId], references: [id])
+  program           Program                    @relation(fields: [programId], references: [id])
+  applications      Application[]
+  customFieldValues StudentCustomFieldValue[]
 
   @@map("student_profiles")
+}
+
+// Admin-defined extra profile fields, scoped per university — lets an admin
+// collect anything beyond the fixed fields above without a schema change.
+model StudentCustomFieldDefinition {
+  id           String           @id @default(uuid())
+  universityId String           @map("university_id")
+  label        String
+  fieldType    StudentFieldType @map("field_type")
+  required     Boolean          @default(false)
+  // Only meaningful (and required) for DROPDOWN — array of option strings.
+  options      Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  university University                 @relation(fields: [universityId], references: [id])
+  values     StudentCustomFieldValue[]
+
+  @@map("student_custom_field_definitions")
+}
+
+model StudentCustomFieldValue {
+  id                String  @id @default(uuid())
+  studentProfileId  String  @map("student_profile_id")
+  fieldDefinitionId String  @map("field_definition_id")
+  value             String?
+
+  studentProfile  StudentProfile               @relation(fields: [studentProfileId], references: [userId])
+  fieldDefinition StudentCustomFieldDefinition @relation(fields: [fieldDefinitionId], references: [id])
+
+  @@unique([studentProfileId, fieldDefinitionId])
+  @@map("student_custom_field_values")
 }
 
 model Company {
