@@ -6,6 +6,7 @@ import { ApplicantsPanel } from "./applicants-panel";
 import { PlacementsOverview } from "./placements-overview";
 import { ProgramsManager } from "./programs-manager";
 import { CompaniesManager } from "./companies-manager";
+import { StudentsManager } from "./students-manager";
 
 export function AdminDashboard() {
   return (
@@ -22,6 +23,7 @@ export function AdminDashboard() {
           <TabsTrigger value="placements">Placements</TabsTrigger>
           <TabsTrigger value="programs">Programs</TabsTrigger>
           <TabsTrigger value="companies">Companies</TabsTrigger>
+          <TabsTrigger value="students">Students</TabsTrigger>
         </TabsList>
         <TabsContent value="drives" className="mt-6">
           <DriveManager />
@@ -37,6 +39,9 @@ export function AdminDashboard() {
         </TabsContent>
         <TabsContent value="companies" className="mt-6">
           <CompaniesManager />
+        </TabsContent>
+        <TabsContent value="students" className="mt-6">
+          <StudentsManager />
         </TabsContent>
       </Tabs>
     </div>
