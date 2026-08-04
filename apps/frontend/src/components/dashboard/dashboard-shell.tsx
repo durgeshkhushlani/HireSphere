@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { ChatPageContextProvider } from "@/lib/chat-page-context";
 import { StudentProfileDialog } from "@/components/student/student-profile-dialog";
+import { AdminProfileDialog } from "@/components/admin/admin-profile-dialog";
 
 function initialsFor(name: string | undefined) {
   if (!name) return "?";
@@ -69,11 +70,9 @@ export function DashboardShell({
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {user?.role === "STUDENT" && (
-                <DropdownMenuItem onClick={() => setProfileOpen(true)}>
-                  <User /> View profile
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                <User /> View profile
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={handleLogout}>
                 <LogOut /> Log out
               </DropdownMenuItem>
@@ -81,9 +80,11 @@ export function DashboardShell({
           </DropdownMenu>
         </header>
 
-        {user?.role === "STUDENT" && (
+        {user?.role === "STUDENT" ? (
           <StudentProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
-        )}
+        ) : user?.role === "ADMIN" ? (
+          <AdminProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+        ) : null}
 
         <div className="bg-muted/30 px-6 pt-4 sm:px-8">
           <button

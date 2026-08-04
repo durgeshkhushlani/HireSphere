@@ -24,6 +24,8 @@ import {
   type ApplicantEntry,
 } from "@/lib/api/applications";
 import { APPLICATION_STATUS_OPTIONS, applicationStatusStyle, type ApplicationStatus } from "@/lib/status";
+import { useUniversityTimezone } from "@/lib/use-university-timezone";
+import { isoToZonedDatetimeLocal, zonedDatetimeLocalToIso } from "@/lib/timezone";
 import { ApplicantDetailDialog } from "./applicant-detail-dialog";
 
 type SavePatch = {
@@ -35,6 +37,7 @@ type SavePatch = {
 
 export function ApplicantsPanel() {
   const { token } = useAuth();
+  const timezone = useUniversityTimezone();
   const [drives, setDrives] = useState<Drive[]>([]);
   const [selectedDriveId, setSelectedDriveId] = useState("");
   const [applicants, setApplicants] = useState<ApplicantEntry[] | null>(null);
@@ -117,7 +120,7 @@ export function ApplicantsPanel() {
         selectedDriveId,
         {
           applicationIds: [...selectedIds],
-          interviewSlot: bulkSlot ? new Date(bulkSlot).toISOString() : undefined,
+          interviewSlot: bulkSlot ? zonedDatetimeLocalToIso(bulkSlot, timezone) : undefined,
           interviewVenue: bulkVenue || undefined,
         },
         token
@@ -211,6 +214,7 @@ export function ApplicantsPanel() {
                 key={applicant.id}
                 applicant={applicant}
                 questions={questions}
+                timezone={timezone}
                 onSave={handleUpdate}
                 onScheduled={() => loadApplicants(selectedDriveId)}
                 selected={selectedIds.has(applicant.id)}
@@ -227,6 +231,7 @@ export function ApplicantsPanel() {
 function ApplicantRow({
   applicant,
   questions,
+  timezone,
   onSave,
   onScheduled,
   selected,
@@ -234,6 +239,7 @@ function ApplicantRow({
 }: {
   applicant: ApplicantEntry;
   questions: ApplicationFormQuestion[];
+  timezone: string;
   onSave: (applicant: ApplicantEntry, patch: SavePatch) => void;
   onScheduled: () => void;
   selected: boolean;
@@ -241,15 +247,28 @@ function ApplicantRow({
 }) {
   const [status, setStatus] = useState<ApplicationStatus>(applicant.status);
   const [interviewSlot, setInterviewSlot] = useState(
-    applicant.interviewSlot ? applicant.interviewSlot.slice(0, 16) : ""
+    applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : ""
   );
   const [interviewVenue, setInterviewVenue] = useState(applicant.interviewVenue ?? "");
   const [selectedRoleId, setSelectedRoleId] = useState(applicant.selectedRole?.id ?? "");
+  const [slotTouched, setSlotTouched] = useState(false);
+
+  // useUniversityTimezone() starts on a fallback default and resolves the
+  // real value async — if that resolution lands after this row already
+  // mounted, the initial conversion above used the (possibly wrong)
+  // fallback. Resync once the real value arrives, as long as the admin
+  // hasn't hand-edited the field yet.
+  useEffect(() => {
+    if (slotTouched) return;
+    setInterviewSlot(applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timezone]);
 
   const dirty =
     status !== applicant.status ||
     interviewVenue !== (applicant.interviewVenue ?? "") ||
-    interviewSlot !== (applicant.interviewSlot ? applicant.interviewSlot.slice(0, 16) : "");
+    interviewSlot !==
+      (applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : "");
 
   const requiresRole = status === "SELECTED" && applicant.rolePreferences.length > 0;
   const canSave = dirty && (!requiresRole || !!selectedRoleId);
@@ -321,7 +340,10 @@ function ApplicantRow({
         <Input
           type="datetime-local"
           value={interviewSlot}
-          onChange={(e) => setInterviewSlot(e.target.value)}
+          onChange={(e) => {
+            setSlotTouched(true);
+            setInterviewSlot(e.target.value);
+          }}
           className="h-7 w-[190px] text-xs"
         />
         <Input
@@ -337,7 +359,7 @@ function ApplicantRow({
           onClick={() =>
             onSave(applicant, {
               status,
-              interviewSlot: interviewSlot ? new Date(interviewSlot).toISOString() : undefined,
+              interviewSlot: interviewSlot ? zonedDatetimeLocalToIso(interviewSlot, timezone) : undefined,
               interviewVenue: interviewVenue || undefined,
               selectedRoleId: requiresRole ? selectedRoleId : undefined,
             })

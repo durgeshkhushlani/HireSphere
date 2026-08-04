@@ -1,5 +1,7 @@
 const express = require('express');
 const universitiesController = require('../controllers/universities.controller');
+const requireAuth = require('../middleware/requireAuth');
+const requireRole = require('../middleware/requireRole');
 
 const router = express.Router();
 
@@ -19,5 +21,9 @@ router.get('/pending', universitiesController.listPending);
 // Also unauthenticated: a student needs to see which programs their
 // university offers before they have any account/token to register with.
 router.get('/:universityId/programs', universitiesController.listPrograms);
+
+// Admin self-service: contact email/phone and the timezone that governs how
+// interview slots are interpreted/displayed university-wide.
+router.patch('/me', requireAuth, requireRole('ADMIN'), universitiesController.updateMine);
 
 module.exports = router;

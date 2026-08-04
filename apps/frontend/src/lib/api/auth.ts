@@ -3,6 +3,19 @@ import type { AuthUser } from "@/lib/auth-context";
 
 type AuthPayload = { token: string; user: AuthUser };
 
+export type MyProfile = AuthUser & {
+  university: {
+    id: string;
+    name: string;
+    domain: string;
+    verified: boolean;
+    contactName: string | null;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    timezone: string;
+  };
+};
+
 export function requestOtp(email: string) {
   return apiFetch<{ message: string }>("/auth/otp/request", {
     method: "POST",
@@ -42,5 +55,5 @@ export function login(email: string, password: string) {
 }
 
 export function getMe(token: string) {
-  return apiFetch<AuthUser>("/auth/me", { token });
+  return apiFetch<MyProfile>("/auth/me", { token });
 }

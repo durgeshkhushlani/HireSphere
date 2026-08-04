@@ -16,4 +16,8 @@ async function listPrograms(req, res) {
   res.json(await universitiesService.listPrograms(req.params.universityId));
 }
 
-module.exports = { list, listPending, create, listPrograms };
+async function updateMine(req, res) {
+  res.json(await universitiesService.updateMine(req.user.universityId, req.body));
+}
+
+module.exports = { list, listPending, create, listPrograms, updateMine };

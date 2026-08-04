@@ -86,8 +86,11 @@ async function login({ email, password }) {
   return authPayload(user);
 }
 
+// Includes the university relation so the profile menu (admin has no other
+// self-profile view, unlike students) can show university name/domain/
+// verification status alongside the registered contact name/email.
 async function getPublicUser(id) {
-  const user = await prisma.user.findUnique({ where: { id } });
+  const user = await prisma.user.findUnique({ where: { id }, include: { university: true } });
   if (!user) throw ApiError.notFound('User not found');
   return toPublicUser(user);
 }

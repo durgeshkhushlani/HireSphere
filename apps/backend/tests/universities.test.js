@@ -4,7 +4,7 @@
 const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resetDb, disconnect } = require('./helpers/db');
-const { api, createUniversity, registerAdmin } = require('./helpers/factories');
+const { api, auth, createUniversity, createProgram, registerAdmin, registerStudent } = require('./helpers/factories');
 
 beforeEach(resetDb);
 after(disconnect);
@@ -125,5 +125,63 @@ describe('GET /api/universities/pending', () => {
     const res = await api().get('/api/universities/pending');
 
     assert.deepEqual(res.body, []);
+  });
+});
+
+describe('PATCH /api/universities/me', () => {
+  test('lets an admin update contact email/phone and timezone', async () => {
+    const university = await createUniversity();
+    const admin = await registerAdmin(university.id);
+
+    const res = await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({
+        contactEmail: `placement@${university.domain}`,
+        contactPhone: '+91 22 1234 5678',
+        timezone: 'Asia/Kolkata',
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.contactEmail, `placement@${university.domain}`);
+    assert.equal(res.body.contactPhone, '+91 22 1234 5678');
+    assert.equal(res.body.timezone, 'Asia/Kolkata');
+  });
+
+  test('rejects a contact email on a different domain', async () => {
+    const university = await createUniversity();
+    const admin = await registerAdmin(university.id);
+
+    const res = await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({ contactEmail: 'someone@gmail.com' });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects an invalid timezone', async () => {
+    const university = await createUniversity();
+    const admin = await registerAdmin(university.id);
+
+    const res = await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({ timezone: 'Not/AZone' });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('is forbidden to students', async () => {
+    const university = await createUniversity();
+    const program = await createProgram();
+    const student = await registerStudent(university.id, program.id);
+
+    const res = await api()
+      .patch('/api/universities/me')
+      .set(...auth(student.token))
+      .send({ timezone: 'Asia/Kolkata' });
+
+    assert.equal(res.status, 403);
   });
 });

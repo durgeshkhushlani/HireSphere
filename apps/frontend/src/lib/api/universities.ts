@@ -42,6 +42,16 @@ export function createProgram(name: string) {
   return apiFetch<Program>("/programs", { method: "POST", body: { name } });
 }
 
+export function updateMyUniversity(
+  input: { contactEmail?: string; contactPhone?: string; timezone?: string },
+  token: string
+) {
+  return apiFetch<University & { contactPhone: string | null; timezone: string }>(
+    "/universities/me",
+    { method: "PATCH", body: input, token }
+  );
+}
+
 export function linkUniversityProgram(programId: string, token: string) {
   return apiFetch<{ id: string; universityId: string; programId: string; program: Program }>(
     "/university-programs",

@@ -3,9 +3,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { applicationStatusStyle } from "@/lib/status";
+import { useUniversityTimezone } from "@/lib/use-university-timezone";
+import { formatInZone } from "@/lib/timezone";
 import type { Application } from "@/lib/api/applications";
 
 export function MyApplications({ applications }: { applications: Application[] | null }) {
+  const timezone = useUniversityTimezone();
+
   if (applications === null) {
     return (
       <div className="flex flex-col gap-3">
@@ -48,7 +52,7 @@ export function MyApplications({ applications }: { applications: Application[] |
                 {app.interviewSlot && (
                   <div className="text-right text-xs text-muted-foreground">
                     <div className="font-semibold text-foreground">
-                      {new Date(app.interviewSlot).toLocaleString()}
+                      {formatInZone(app.interviewSlot, timezone)}
                     </div>
                     {app.interviewVenue && <div>{app.interviewVenue}</div>}
                   </div>

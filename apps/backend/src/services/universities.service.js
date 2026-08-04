@@ -66,4 +66,43 @@ async function listPrograms(universityId) {
   return rows.map((row) => row.program);
 }
 
-module.exports = { list, listPending, create, listPrograms };
+function isValidTimeZone(tz) {
+  try {
+    // eslint-disable-next-line no-new
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Admin self-service: only these 3 fields, since nothing else about a
+// university (name, domain, verified status) should be editable by its own
+// admin. contactPhone has no format validation (international numbers vary
+// too much to police usefully); contactEmail keeps the same domain-match
+// rule as registration.
+async function updateMine(universityId, { contactEmail, contactPhone, timezone }) {
+  const university = await prisma.university.findUnique({ where: { id: universityId } });
+  if (!university) throw ApiError.notFound('University not found');
+
+  if (contactEmail !== undefined) {
+    const contactDomain = contactEmail.split('@')[1]?.toLowerCase();
+    if (contactDomain !== university.domain.toLowerCase()) {
+      throw ApiError.badRequest('Contact email must be at the same domain as the university');
+    }
+  }
+  if (timezone !== undefined && !isValidTimeZone(timezone)) {
+    throw ApiError.badRequest('timezone must be a valid IANA time zone id, e.g. "Asia/Kolkata"');
+  }
+
+  return prisma.university.update({
+    where: { id: universityId },
+    data: {
+      ...(contactEmail !== undefined && { contactEmail }),
+      ...(contactPhone !== undefined && { contactPhone }),
+      ...(timezone !== undefined && { timezone }),
+    },
+  });
+}
+
+module.exports = { list, listPending, create, listPrograms, updateMine };

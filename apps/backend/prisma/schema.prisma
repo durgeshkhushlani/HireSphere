@@ -57,6 +57,12 @@ model University {
   verified     Boolean @default(false)
   contactName  String? @map("contact_name")
   contactEmail String? @map("contact_email")
+  contactPhone String? @map("contact_phone")
+  // IANA zone id (e.g. "Asia/Kolkata") — governs how interview slot times
+  // are interpreted/displayed everywhere in the app, not each viewer's own
+  // browser timezone, since an interview happens at the university's
+  // physical location regardless of who's looking at the schedule.
+  timezone     String  @default("Asia/Kolkata")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
