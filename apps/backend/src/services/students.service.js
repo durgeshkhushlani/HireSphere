@@ -68,12 +68,13 @@ async function getFullProfileForUniversity(userId, universityId) {
 
 // Editable while the profile is unverified; once an admin verifies it, only
 // address/phone remain changeable (custom field values lock too).
-const EDITABLE_WHEN_UNVERIFIED = ['tenthPercentage', 'twelfthPercentage', 'bloodGroup', 'address', 'phone'];
+const EDITABLE_WHEN_UNVERIFIED = ['studentId', 'tenthPercentage', 'twelfthPercentage', 'bloodGroup', 'address', 'phone'];
 const EDITABLE_WHEN_VERIFIED = ['address', 'phone'];
 
 // All required — a student must fill in every one of these before an admin
 // can meaningfully verify the profile.
 const FIXED_REQUIRED_FIELDS = [
+  { key: 'studentId', label: 'Student ID' },
   { key: 'tenthPercentage', label: '10th %' },
   { key: 'twelfthPercentage', label: '12th %' },
   { key: 'bloodGroup', label: 'Blood group' },

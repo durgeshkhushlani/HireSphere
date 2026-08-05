@@ -27,6 +27,7 @@ export type StudentProfile = {
   cgpa: string;
   backlogCount: number;
   placementLocked: boolean;
+  studentId: string | null;
   tenthPercentage: string | null;
   twelfthPercentage: string | null;
   bloodGroup: string | null;
@@ -53,6 +54,7 @@ export function getMyProfile(token: string) {
 
 export function updateMyProfile(
   patch: {
+    studentId?: string | null;
     tenthPercentage?: number | null;
     twelfthPercentage?: number | null;
     bloodGroup?: string | null;

@@ -45,6 +45,7 @@ export function StudentProfileDialog({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [studentId, setStudentId] = useState("");
   const [tenth, setTenth] = useState("");
   const [twelfth, setTwelfth] = useState("");
   const [bloodGroup, setBloodGroup] = useState("");
@@ -54,6 +55,7 @@ export function StudentProfileDialog({
 
   function syncFormState(p: StudentProfile) {
     setProfile(p);
+    setStudentId(p.studentId ?? "");
     setTenth(p.tenthPercentage ?? "");
     setTwelfth(p.twelfthPercentage ?? "");
     setBloodGroup(p.bloodGroup ?? "");
@@ -85,6 +87,7 @@ export function StudentProfileDialog({
       const patch = verified
         ? { address: address || null, phone: phone || null }
         : {
+            studentId: studentId || null,
             tenthPercentage: tenth === "" ? null : Number(tenth),
             twelfthPercentage: twelfth === "" ? null : Number(twelfth),
             bloodGroup: bloodGroup || null,
@@ -132,6 +135,12 @@ export function StudentProfileDialog({
                 <>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                      Student ID <span className="text-destructive">*</span>
+                    </Label>
+                    <Input value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
                       10th % <span className="text-destructive">*</span>
                     </Label>
                     <Input type="number" min={0} max={100} value={tenth} onChange={(e) => setTenth(e.target.value)} />
@@ -151,6 +160,7 @@ export function StudentProfileDialog({
                 </>
               ) : (
                 <>
+                  <Field label="Student ID" value={profile.studentId} />
                   <Field label="10th %" value={profile.tenthPercentage} />
                   <Field label="12th %" value={profile.twelfthPercentage} />
                   <Field label="Blood group" value={profile.bloodGroup} />

@@ -84,6 +84,7 @@ export function StudentDetailDialog({
         ) : (
           <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
+              <Field label="Student ID" value={profile.studentId} />
               <Field label="Program" value={profile.program.name} />
               <Field label="CGPA" value={profile.cgpa} />
               <Field label="Backlogs" value={profile.backlogCount} />

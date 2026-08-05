@@ -19,6 +19,7 @@ async function seed() {
 // baseline first, same as a real student would fill in before an admin ever
 // verifies them.
 const COMPLETE_FIXED_FIELDS = {
+  studentId: 'TEST-001',
   tenthPercentage: 90,
   twelfthPercentage: 85,
   bloodGroup: 'O+',

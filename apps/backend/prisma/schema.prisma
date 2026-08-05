@@ -129,6 +129,7 @@ model StudentProfile {
   // admin verifies the profile — once verified, only address/phone stay
   // editable (enforced in students.service.js, same "null = not set, checked
   // where written" convention as the rest of this schema).
+  studentId         String?  @map("student_id")
   tenthPercentage   Decimal? @map("tenth_percentage") @db.Decimal(5, 2)
   twelfthPercentage Decimal? @map("twelfth_percentage") @db.Decimal(5, 2)
   bloodGroup        String?  @map("blood_group")
