@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiFetchBlob } from "./client";
 import type { ApplicationStatus } from "@/lib/status";
 import type { Drive, DriveRole } from "./drives";
 
@@ -88,6 +88,18 @@ export function bulkSetInterviewSchedule(
 ) {
   return apiFetch<ApplicantEntry[]>(`/drives/${driveId}/applications/interview-schedule`, {
     method: "PATCH",
+    body: input,
+    token,
+  });
+}
+
+export function exportApplicantsForDrive(
+  driveId: string,
+  input: { statuses?: ApplicationStatus[]; columns: string[] },
+  token: string
+) {
+  return apiFetchBlob(`/drives/${driveId}/applications/export`, {
+    method: "POST",
     body: input,
     token,
   });

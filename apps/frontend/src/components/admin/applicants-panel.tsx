@@ -28,6 +28,7 @@ import { useUniversityTimezone } from "@/lib/use-university-timezone";
 import { isoToZonedDatetimeLocal, zonedDatetimeLocalToIso } from "@/lib/timezone";
 import { SearchInput } from "@/components/ui/search-input";
 import { ApplicantDetailDialog } from "./applicant-detail-dialog";
+import { ExportApplicantsDialog } from "./export-applicants-dialog";
 
 type SavePatch = {
   status: ApplicationStatus;
@@ -57,6 +58,7 @@ export function ApplicantsPanel() {
   const [bulkStatus, setBulkStatus] = useState<ApplicationStatus | "">("");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [query, setQuery] = useState("");
+  const selectedDrive = drives.find((d) => d.id === selectedDriveId);
 
   useEffect(() => {
     if (!token) return;
@@ -187,8 +189,17 @@ export function ApplicantsPanel() {
         </Select>
       </div>
 
-      {selectedDriveId && applicants && applicants.length > 0 && (
-        <SearchInput value={query} onChange={setQuery} placeholder="Search applicants…" />
+      {selectedDrive && applicants && applicants.length > 0 && (
+        <div className="flex items-center gap-2">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search applicants…" />
+          <ExportApplicantsDialog
+            driveId={selectedDrive.id}
+            driveTitle={selectedDrive.title}
+            companyName={selectedDrive.company.name}
+            questions={questions}
+            hasRoles={selectedDrive.roles.length > 0}
+          />
+        </div>
       )}
 
       {!selectedDriveId ? (
