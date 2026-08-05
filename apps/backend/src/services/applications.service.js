@@ -11,6 +11,10 @@ const APPLICATION_STATUSES = [
   'NOT_SELECTED',
 ];
 
+// Interview slot/venue only make sense once an applicant has actually
+// reached the OA/Test or Interview stage.
+const SLOT_ALLOWED_STATUSES = ['OA_TEST', 'INTERVIEW'];
+
 // A student's ranked role preferences, plus whichever one they were finally
 // placed into (set by updateStatus when moving to SELECTED).
 const ROLE_PREFERENCES_INCLUDE = {
@@ -186,6 +190,13 @@ async function updateStatus(
     throw ApiError.notFound('Application not found');
   }
 
+  if ((interviewSlot !== undefined || interviewVenue !== undefined) && !SLOT_ALLOWED_STATUSES.includes(status)) {
+    throw ApiError.badRequest('Interview slot/venue can only be set when status is OA/Test or Interview');
+  }
+  if (SLOT_ALLOWED_STATUSES.includes(status) && interviewSlot === undefined && !application.interviewSlot) {
+    throw ApiError.badRequest('An interview slot is required for OA/Test or Interview status');
+  }
+
   const wasSelected = application.status === 'SELECTED';
   const nowSelected = status === 'SELECTED';
 
@@ -263,22 +274,58 @@ async function updateStatus(
 // the bulk path; updateStatus above remains the individual one. Validates
 // every id belongs to this drive *before* writing anything, so a mixed
 // valid/invalid batch fails cleanly instead of partially applying.
-async function bulkSetInterviewSchedule(driveId, universityId, { applicationIds, interviewSlot, interviewVenue }) {
+async function bulkSetInterviewSchedule(
+  driveId,
+  universityId,
+  { applicationIds, interviewSlot, interviewVenue, status }
+) {
   if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
     throw ApiError.badRequest('applicationIds must be a non-empty array');
   }
-  if (interviewSlot === undefined && interviewVenue === undefined) {
-    throw ApiError.badRequest('interviewSlot or interviewVenue is required');
+  if (interviewSlot === undefined && interviewVenue === undefined && status === undefined) {
+    throw ApiError.badRequest('interviewSlot, interviewVenue, or status is required');
+  }
+  if (status !== undefined && !APPLICATION_STATUSES.includes(status)) {
+    throw ApiError.badRequest(`status must be one of: ${APPLICATION_STATUSES.join(', ')}`);
+  }
+  // SELECTED needs a per-applicant role choice (and creates a placement) —
+  // not something that's safe to do identically across a batch. Same for
+  // moving *off* SELECTED, which must release the placement lock. Both stay
+  // on the individual-row flow, which already handles them correctly.
+  if (status === 'SELECTED') {
+    throw ApiError.badRequest(
+      'Bulk-selecting is not supported — mark each applicant Selected individually so their role can be chosen'
+    );
   }
 
   const drive = await drivesService.requireScoped(driveId, universityId);
   const uniqueIds = [...new Set(applicationIds)];
 
-  const matchingCount = await prisma.application.count({
+  const applications = await prisma.application.findMany({
     where: { id: { in: uniqueIds }, driveId: drive.id },
   });
-  if (matchingCount !== uniqueIds.length) {
+  if (applications.length !== uniqueIds.length) {
     throw ApiError.badRequest('One or more applicationIds do not belong to this drive');
+  }
+  if (status !== undefined && applications.some((a) => a.status === 'SELECTED')) {
+    throw ApiError.badRequest(
+      'One or more selected applicants are already Selected — change their status individually so the placement lock releases correctly'
+    );
+  }
+
+  if (interviewSlot !== undefined || interviewVenue !== undefined) {
+    const effectiveStatuses = status !== undefined ? [status] : applications.map((a) => a.status);
+    if (effectiveStatuses.some((s) => !SLOT_ALLOWED_STATUSES.includes(s))) {
+      throw ApiError.badRequest('Interview slot/venue can only be set when status is OA/Test or Interview');
+    }
+  }
+  if (
+    status !== undefined &&
+    SLOT_ALLOWED_STATUSES.includes(status) &&
+    interviewSlot === undefined &&
+    applications.some((a) => !a.interviewSlot)
+  ) {
+    throw ApiError.badRequest('An interview slot is required for OA/Test or Interview status');
   }
 
   await prisma.application.updateMany({
@@ -286,6 +333,7 @@ async function bulkSetInterviewSchedule(driveId, universityId, { applicationIds,
     data: {
       ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
       ...(interviewVenue !== undefined && { interviewVenue }),
+      ...(status !== undefined && { status }),
     },
   });
 

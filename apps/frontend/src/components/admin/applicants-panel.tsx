@@ -26,6 +26,7 @@ import {
 import { APPLICATION_STATUS_OPTIONS, applicationStatusStyle, type ApplicationStatus } from "@/lib/status";
 import { useUniversityTimezone } from "@/lib/use-university-timezone";
 import { isoToZonedDatetimeLocal, zonedDatetimeLocalToIso } from "@/lib/timezone";
+import { SearchInput } from "@/components/ui/search-input";
 import { ApplicantDetailDialog } from "./applicant-detail-dialog";
 
 type SavePatch = {
@@ -34,6 +35,14 @@ type SavePatch = {
   interviewVenue?: string;
   selectedRoleId?: string;
 };
+
+// Interview slot/venue only apply once an applicant reaches these stages —
+// the backend rejects them for any other status.
+const SLOT_STATUSES: ApplicationStatus[] = ["OA_TEST", "INTERVIEW"];
+
+function defaultSlot(timezone: string) {
+  return isoToZonedDatetimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), timezone);
+}
 
 export function ApplicantsPanel() {
   const { token } = useAuth();
@@ -45,7 +54,9 @@ export function ApplicantsPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSlot, setBulkSlot] = useState("");
   const [bulkVenue, setBulkVenue] = useState("");
+  const [bulkStatus, setBulkStatus] = useState<ApplicationStatus | "">("");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -108,10 +119,25 @@ export function ApplicantsPanel() {
     });
   }
 
+  function toggleSelectAll(ids: string[]) {
+    setSelectedIds((prev) => (prev.size === ids.length ? new Set() : new Set(ids)));
+  }
+
+  // Slot/venue fields make sense either when the status is being changed to
+  // OA/Test or Interview, or when status is left untouched (a plain
+  // reschedule for applicants already at that stage) — the backend enforces
+  // the latter case by checking each selected applicant's current status.
+  const bulkSlotAllowed = bulkStatus === "" || SLOT_STATUSES.includes(bulkStatus);
+  const bulkSlotRequired = bulkStatus !== "" && SLOT_STATUSES.includes(bulkStatus);
+
   async function handleBulkSchedule() {
     if (!token || !selectedDriveId) return;
-    if (!bulkSlot && !bulkVenue) {
-      toast.error("Set an interview slot or venue first");
+    if (!bulkSlot && !bulkVenue && !bulkStatus) {
+      toast.error("Set an interview slot, venue, or status first");
+      return;
+    }
+    if (bulkSlotRequired && !bulkSlot) {
+      toast.error("An interview slot is required for OA/Test or Interview status");
       return;
     }
     setBulkSubmitting(true);
@@ -120,17 +146,19 @@ export function ApplicantsPanel() {
         selectedDriveId,
         {
           applicationIds: [...selectedIds],
-          interviewSlot: bulkSlot ? zonedDatetimeLocalToIso(bulkSlot, timezone) : undefined,
-          interviewVenue: bulkVenue || undefined,
+          interviewSlot: bulkSlotAllowed && bulkSlot ? zonedDatetimeLocalToIso(bulkSlot, timezone) : undefined,
+          interviewVenue: bulkSlotAllowed && bulkVenue ? bulkVenue : undefined,
+          status: bulkStatus || undefined,
         },
         token
       );
-      toast.success(`Scheduled interviews for ${selectedIds.size} applicant(s)`);
+      toast.success(`Updated ${selectedIds.size} applicant(s)`);
       setBulkSlot("");
       setBulkVenue("");
+      setBulkStatus("");
       loadApplicants(selectedDriveId);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Couldn't schedule interviews");
+      toast.error(err instanceof ApiError ? err.message : "Couldn't apply bulk update");
     } finally {
       setBulkSubmitting(false);
     }
@@ -159,6 +187,10 @@ export function ApplicantsPanel() {
         </Select>
       </div>
 
+      {selectedDriveId && applicants && applicants.length > 0 && (
+        <SearchInput value={query} onChange={setQuery} placeholder="Search applicants…" />
+      )}
+
       {!selectedDriveId ? (
         <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
           Pick a drive to review its applicants.
@@ -174,55 +206,110 @@ export function ApplicantsPanel() {
           No applications yet for this drive.
         </p>
       ) : (
-        <>
-          {selectedIds.size > 0 && (
-            <Card size="sm" className="border-primary/40 bg-primary/5">
-              <CardContent className="flex flex-wrap items-center gap-3">
-                <span className="text-xs font-bold text-primary">
-                  {selectedIds.size} selected — bulk-schedule interview
-                </span>
-                <Input
-                  type="datetime-local"
-                  value={bulkSlot}
-                  onChange={(e) => setBulkSlot(e.target.value)}
-                  className="h-7 w-[190px] text-xs"
-                />
-                <Input
-                  value={bulkVenue}
-                  onChange={(e) => setBulkVenue(e.target.value)}
-                  placeholder="Venue"
-                  className="h-7 w-[140px] text-xs"
-                />
-                <Button size="sm" disabled={bulkSubmitting} onClick={handleBulkSchedule}>
-                  {bulkSubmitting ? "Applying…" : "Apply to selected"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSelectedIds(new Set())}
-                  disabled={bulkSubmitting}
-                >
-                  Clear
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+        (() => {
+          const filtered = applicants.filter((a) => {
+            const q = query.toLowerCase();
+            return (
+              a.studentProfile.user.name.toLowerCase().includes(q) ||
+              a.studentProfile.user.email.toLowerCase().includes(q)
+            );
+          });
+          const filteredIds = filtered.map((a) => a.id);
 
-          <div className="flex flex-col gap-3">
-            {applicants.map((applicant) => (
-              <ApplicantRow
-                key={applicant.id}
-                applicant={applicant}
-                questions={questions}
-                timezone={timezone}
-                onSave={handleUpdate}
-                onScheduled={() => loadApplicants(selectedDriveId)}
-                selected={selectedIds.has(applicant.id)}
-                onToggleSelect={() => toggleSelected(applicant.id)}
-              />
-            ))}
-          </div>
-        </>
+          return (
+            <>
+              {selectedIds.size > 0 && (
+                <Card size="sm" className="border-primary/40 bg-primary/5">
+                  <CardContent className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs font-bold text-primary">
+                      {selectedIds.size} selected — bulk update
+                    </span>
+                    <Select
+                      value={bulkStatus}
+                      onValueChange={(v) => {
+                        const next = (v ?? "") as ApplicationStatus | "";
+                        setBulkStatus(next);
+                        if (next !== "" && SLOT_STATUSES.includes(next) && !bulkSlot) {
+                          setBulkSlot(defaultSlot(timezone));
+                        }
+                      }}
+                    >
+                      <SelectTrigger size="sm" className="w-[140px] text-xs">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {APPLICATION_STATUS_OPTIONS.filter((s) => s !== "SELECTED").map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {applicationStatusStyle(s).label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {bulkSlotAllowed && (
+                      <>
+                        <Input
+                          type="datetime-local"
+                          value={bulkSlot}
+                          onChange={(e) => setBulkSlot(e.target.value)}
+                          className="h-7 w-[190px] text-xs"
+                        />
+                        <Input
+                          value={bulkVenue}
+                          onChange={(e) => setBulkVenue(e.target.value)}
+                          placeholder="Venue"
+                          className="h-7 w-[140px] text-xs"
+                        />
+                      </>
+                    )}
+                    <Button size="sm" disabled={bulkSubmitting} onClick={handleBulkSchedule}>
+                      {bulkSubmitting ? "Applying…" : "Apply to selected"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedIds(new Set())}
+                      disabled={bulkSubmitting}
+                    >
+                      Clear
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {filtered.length === 0 ? (
+                <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+                  No applicants match &quot;{query}&quot;.
+                </p>
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id))}
+                      onChange={() => toggleSelectAll(filteredIds)}
+                      className="size-4 rounded border-input"
+                    />
+                    Select all ({filtered.length})
+                  </label>
+
+                  <div className="flex flex-col gap-3">
+                    {filtered.map((applicant) => (
+                      <ApplicantRow
+                        key={applicant.id}
+                        applicant={applicant}
+                        questions={questions}
+                        timezone={timezone}
+                        onSave={handleUpdate}
+                        selected={selectedIds.has(applicant.id)}
+                        onToggleSelect={() => toggleSelected(applicant.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()
       )}
     </div>
   );
@@ -233,7 +320,6 @@ function ApplicantRow({
   questions,
   timezone,
   onSave,
-  onScheduled,
   selected,
   onToggleSelect,
 }: {
@@ -241,7 +327,6 @@ function ApplicantRow({
   questions: ApplicationFormQuestion[];
   timezone: string;
   onSave: (applicant: ApplicantEntry, patch: SavePatch) => void;
-  onScheduled: () => void;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
@@ -264,14 +349,17 @@ function ApplicantRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timezone]);
 
+  const slotEditable = SLOT_STATUSES.includes(status);
+
   const dirty =
     status !== applicant.status ||
-    interviewVenue !== (applicant.interviewVenue ?? "") ||
-    interviewSlot !==
-      (applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : "");
+    (slotEditable &&
+      (interviewVenue !== (applicant.interviewVenue ?? "") ||
+        interviewSlot !==
+          (applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : "")));
 
   const requiresRole = status === "SELECTED" && applicant.rolePreferences.length > 0;
-  const canSave = dirty && (!requiresRole || !!selectedRoleId);
+  const canSave = dirty && (!requiresRole || !!selectedRoleId) && (!slotEditable || !!interviewSlot);
 
   return (
     <Card size="sm">
@@ -301,7 +389,15 @@ function ApplicantRow({
 
         <Select
           value={status}
-          onValueChange={(value) => value && setStatus(value as ApplicationStatus)}
+          onValueChange={(value) => {
+            if (!value) return;
+            const next = value as ApplicationStatus;
+            setStatus(next);
+            if (SLOT_STATUSES.includes(next) && !interviewSlot) {
+              setSlotTouched(true);
+              setInterviewSlot(defaultSlot(timezone));
+            }
+          }}
         >
           <SelectTrigger size="sm" className="w-[140px] text-xs">
             <SelectValue />
@@ -337,21 +433,25 @@ function ApplicantRow({
           </Select>
         )}
 
-        <Input
-          type="datetime-local"
-          value={interviewSlot}
-          onChange={(e) => {
-            setSlotTouched(true);
-            setInterviewSlot(e.target.value);
-          }}
-          className="h-7 w-[190px] text-xs"
-        />
-        <Input
-          value={interviewVenue}
-          onChange={(e) => setInterviewVenue(e.target.value)}
-          placeholder="Venue"
-          className="h-7 w-[140px] text-xs"
-        />
+        {slotEditable && (
+          <>
+            <Input
+              type="datetime-local"
+              value={interviewSlot}
+              onChange={(e) => {
+                setSlotTouched(true);
+                setInterviewSlot(e.target.value);
+              }}
+              className="h-7 w-[190px] text-xs"
+            />
+            <Input
+              value={interviewVenue}
+              onChange={(e) => setInterviewVenue(e.target.value)}
+              placeholder="Venue"
+              className="h-7 w-[140px] text-xs"
+            />
+          </>
+        )}
 
         <Button
           size="sm"
@@ -359,8 +459,8 @@ function ApplicantRow({
           onClick={() =>
             onSave(applicant, {
               status,
-              interviewSlot: interviewSlot ? zonedDatetimeLocalToIso(interviewSlot, timezone) : undefined,
-              interviewVenue: interviewVenue || undefined,
+              interviewSlot: slotEditable && interviewSlot ? zonedDatetimeLocalToIso(interviewSlot, timezone) : undefined,
+              interviewVenue: slotEditable && interviewVenue ? interviewVenue : undefined,
               selectedRoleId: requiresRole ? selectedRoleId : undefined,
             })
           }
@@ -368,11 +468,7 @@ function ApplicantRow({
           Save
         </Button>
 
-        <ApplicantDetailDialog
-          applicant={applicant}
-          questions={questions}
-          onScheduled={onScheduled}
-        />
+        <ApplicantDetailDialog applicant={applicant} questions={questions} />
       </CardContent>
     </Card>
   );

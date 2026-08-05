@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,44 +11,28 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/lib/auth-context";
-import { ApiError } from "@/lib/api/client";
-import { scheduleResumeDelivery, type ApplicantEntry } from "@/lib/api/applications";
+import { type ApplicantEntry } from "@/lib/api/applications";
 import type { ApplicationFormQuestion } from "@/lib/api/drives";
+import { normalizeUrl } from "@/lib/url";
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+      <div className="text-sm">{value ?? <span className="text-muted-foreground">—</span>}</div>
+    </div>
+  );
+}
 
 export function ApplicantDetailDialog({
   applicant,
   questions,
-  onScheduled,
 }: {
   applicant: ApplicantEntry;
   questions: ApplicationFormQuestion[];
-  onScheduled: () => void;
 }) {
-  const { token } = useAuth();
   const [open, setOpen] = useState(false);
-  const [dispatchAt, setDispatchAt] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSchedule() {
-    if (!token || !dispatchAt) {
-      toast.error("Pick a date and time");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await scheduleResumeDelivery(applicant.id, new Date(dispatchAt).toISOString(), token);
-      toast.success("Resume delivery scheduled");
-      setDispatchAt("");
-      onScheduled();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Couldn't schedule resume delivery");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -63,6 +46,26 @@ export function ApplicantDetailDialog({
         </DialogHeader>
 
         <div className="flex max-h-[55vh] flex-col gap-5 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Student ID" value={applicant.studentProfile.studentId} />
+            <Field label="CGPA" value={applicant.studentProfile.cgpa} />
+            <Field label="Email" value={applicant.studentProfile.user.email} />
+            <Field label="Program" value={applicant.studentProfile.program.name} />
+          </div>
+
+          {applicant.rolePreferences.length > 0 && (
+            <div>
+              <Label className="mb-2 text-xs font-semibold text-muted-foreground">
+                Ranked role preferences
+              </Label>
+              <ul className="list-inside list-decimal text-sm">
+                {applicant.rolePreferences.map((p) => (
+                  <li key={p.driveRole.id}>{p.driveRole.title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div>
             <Label className="mb-2 text-xs font-semibold text-muted-foreground">
               Application responses
@@ -86,42 +89,14 @@ export function ApplicantDetailDialog({
             {!applicant.resumeUrl ? (
               <p className="text-xs text-muted-foreground">No resume submitted.</p>
             ) : (
-              <div className="flex flex-col gap-2">
-                <a
-                  href={applicant.resumeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-semibold text-primary underline underline-offset-2"
-                >
-                  View resume ↗
-                </a>
-
-                {applicant.resumeSentAt ? (
-                  <p className="text-xs text-muted-foreground">
-                    Sent to the company on {new Date(applicant.resumeSentAt).toLocaleString()}
-                  </p>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="datetime-local"
-                        value={dispatchAt}
-                        onChange={(e) => setDispatchAt(e.target.value)}
-                        className="h-8 flex-1 text-sm"
-                      />
-                      <Button size="sm" onClick={handleSchedule} disabled={submitting}>
-                        {submitting ? "Scheduling…" : "Schedule"}
-                      </Button>
-                    </div>
-                    {applicant.resumeDispatchAt && (
-                      <p className="text-xs text-muted-foreground">
-                        Currently scheduled for{" "}
-                        {new Date(applicant.resumeDispatchAt).toLocaleString()}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+              <a
+                href={normalizeUrl(applicant.resumeUrl)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-semibold text-primary underline underline-offset-2"
+              >
+                View resume ↗
+              </a>
             )}
           </div>
         </div>

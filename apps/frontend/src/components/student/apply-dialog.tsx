@@ -23,6 +23,7 @@ import {
   type ApplicationFormQuestion,
   type Drive,
 } from "@/lib/api/drives";
+import { normalizeUrl } from "@/lib/url";
 
 export function ApplyDialog({
   drive,
@@ -89,7 +90,7 @@ export function ApplyDialog({
         drive.id,
         {
           responses,
-          resumeUrl: resumeUrl || undefined,
+          resumeUrl: resumeUrl ? normalizeUrl(resumeUrl) : undefined,
           rolePreferences: drive.roles.length > 0 ? rolePreferences : undefined,
         },
         token

@@ -39,6 +39,8 @@ export type ApplicantEntry = {
   resumeSentAt: string | null;
   createdAt: string;
   studentProfile: {
+    studentId: string | null;
+    cgpa: string;
     user: { id: string; name: string; email: string };
     program: { id: string; name: string };
   };
@@ -76,7 +78,12 @@ export function scheduleResumeDelivery(id: string, dispatchAt: string, token: st
 
 export function bulkSetInterviewSchedule(
   driveId: string,
-  input: { applicationIds: string[]; interviewSlot?: string; interviewVenue?: string },
+  input: {
+    applicationIds: string[];
+    interviewSlot?: string;
+    interviewVenue?: string;
+    status?: ApplicationStatus;
+  },
   token: string
 ) {
   return apiFetch<ApplicantEntry[]>(`/drives/${driveId}/applications/interview-schedule`, {

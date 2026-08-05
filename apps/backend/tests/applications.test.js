@@ -312,6 +312,33 @@ describe('PATCH /api/applications/:id/status', () => {
     assert.equal(new Date(res.body.interviewSlot).toISOString(), '2026-09-01T10:00:00.000Z');
   });
 
+  test('rejects an interview slot/venue when the status is not OA/Test or Interview', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await api()
+      .patch(`/api/applications/${created.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({
+        status: 'SHORTLISTED',
+        interviewSlot: '2026-09-01T10:00:00.000Z',
+      });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects moving to Interview with no slot ever set', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await api()
+      .patch(`/api/applications/${created.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'INTERVIEW' });
+
+    assert.equal(res.status, 400);
+  });
+
   test('rejects an invalid status with 400', async () => {
     const { admin, student, drive } = await seedScenario();
     const created = await applyTo(drive.id, student.token);
@@ -354,6 +381,7 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
       applicationIds: [first.body.id, second.body.id],
       interviewSlot: '2026-09-01T10:00:00.000Z',
       interviewVenue: 'Room 204',
+      status: 'OA_TEST',
     });
 
     assert.equal(res.status, 200);
@@ -364,7 +392,27 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
     }
   });
 
-  test('does not change status', async () => {
+  test('does not change status when status is omitted', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      interviewSlot: '2026-09-01T10:00:00.000Z',
+      status: 'OA_TEST',
+    });
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      interviewVenue: 'Room 204',
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body[0].status, 'OA_TEST');
+    assert.equal(res.body[0].interviewVenue, 'Room 204');
+  });
+
+  test('rejects setting interview slot/venue for a status outside OA/Test or Interview', async () => {
     const { admin, student, drive } = await seedScenario();
     const created = await applyTo(drive.id, student.token);
 
@@ -373,7 +421,7 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
       interviewVenue: 'Room 204',
     });
 
-    assert.equal(res.body[0].status, 'APPLIED');
+    assert.equal(res.status, 400);
   });
 
   test('rejects if any applicationId does not belong to this drive, applying nothing', async () => {
@@ -426,5 +474,62 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
     });
 
     assert.equal(res.status, 403);
+  });
+
+  test('bulk-updates status for every listed application', async () => {
+    const { university, program, admin, student, drive } = await seedScenario();
+    const other = await registerStudent(university.id, program.id);
+    const first = await applyTo(drive.id, student.token);
+    const second = await applyTo(drive.id, other.token);
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [first.body.id, second.body.id],
+      status: 'SHORTLISTED',
+    });
+
+    assert.equal(res.status, 200);
+    for (const application of res.body) {
+      assert.equal(application.status, 'SHORTLISTED');
+    }
+  });
+
+  test('rejects bulk-selecting — SELECTED needs a per-applicant role choice', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      status: 'SELECTED',
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects a bulk status change touching an already-Selected applicant', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+    await api()
+      .patch(`/api/applications/${created.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'SELECTED' });
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      status: 'NOT_SELECTED',
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects an invalid status value', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      status: 'BOGUS',
+    });
+
+    assert.equal(res.status, 400);
   });
 });
