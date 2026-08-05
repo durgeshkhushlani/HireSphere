@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +51,7 @@ export function AuthFlow({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [cgpa, setCgpa] = useState("");
   const [programId, setProgramId] = useState("");
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -200,7 +201,15 @@ export function AuthFlow({
   }
 
   return (
-    <div className="flex min-h-full flex-1">
+    <div className="relative flex min-h-full flex-1">
+      <Link
+        href="/"
+        aria-label="Back to home"
+        className="absolute top-6 left-6 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-muted"
+      >
+        <ArrowLeft className="size-4" />
+      </Link>
+
       <div className="relative hidden w-[42%] flex-col items-center justify-center overflow-hidden border-r bg-muted/60 p-14 lg:flex">
         <div
           className="absolute inset-0"
@@ -291,20 +300,31 @@ export function AuthFlow({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@university.edu"
+                  placeholder="name@university.edu"
                 />
               </div>
               <div>
                 <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
                   Password
                 </Label>
-                <Input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" disabled={submitting} className="mt-2">
                 {submitting ? "Signing in…" : "Continue"}
@@ -334,21 +354,32 @@ export function AuthFlow({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@university.edu"
+                  placeholder="name@university.edu"
                 />
               </div>
               <div>
                 <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
                   Password
                 </Label>
-                <Input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    className="pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" disabled={submitting} className="mt-2">
                 {submitting ? "Checking…" : "Continue"}
