@@ -97,6 +97,15 @@ async function getApplicationForm(driveId, universityId) {
   return form;
 }
 
+// Same data as getApplicationForm, but a drive with no custom questions
+// returns an empty list instead of 404ing — used by export.service.js, which
+// treats "no form" as "zero question columns" rather than an error.
+async function getApplicationFormOrEmpty(driveId, universityId) {
+  const drive = await requireScoped(driveId, universityId);
+  const form = await prisma.applicationForm.findUnique({ where: { driveId: drive.id } });
+  return form ? form.questions : [];
+}
+
 async function setApplicationForm(driveId, universityId, questions) {
   if (!Array.isArray(questions)) {
     throw ApiError.badRequest('questions must be an array');
@@ -253,6 +262,7 @@ module.exports = {
   updateDetails,
   updateStatus,
   getApplicationForm,
+  getApplicationFormOrEmpty,
   setApplicationForm,
   getEligiblePrograms,
   setEligiblePrograms,

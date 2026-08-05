@@ -144,6 +144,21 @@ async function listForDrive(driveId, universityId) {
   });
 }
 
+// Same as listForDrive, but restricted to the given statuses — backs the
+// Excel export, where an admin can choose which stages to include.
+async function listForDriveByStatus(driveId, universityId, statuses) {
+  const drive = await drivesService.requireScoped(driveId, universityId);
+
+  return prisma.application.findMany({
+    where: {
+      driveId: drive.id,
+      ...(Array.isArray(statuses) && statuses.length > 0 && { status: { in: statuses } }),
+    },
+    include: APPLICANT_INCLUDE,
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
 function listForStudent(studentProfileId) {
   return prisma.application.findMany({
     where: { studentProfileId },
@@ -377,6 +392,7 @@ module.exports = {
   APPLICATION_STATUSES,
   applyToDrive,
   listForDrive,
+  listForDriveByStatus,
   listForStudent,
   getForUser,
   updateStatus,

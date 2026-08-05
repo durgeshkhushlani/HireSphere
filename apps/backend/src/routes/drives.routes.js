@@ -1,6 +1,7 @@
 const express = require('express');
 const drivesController = require('../controllers/drives.controller');
 const applicationsController = require('../controllers/applications.controller');
+const exportController = require('../controllers/export.controller');
 const requireAuth = require('../middleware/requireAuth');
 const requireRole = require('../middleware/requireRole');
 
@@ -44,6 +45,14 @@ router.patch(
   '/:driveId/applications/interview-schedule',
   requireRole('ADMIN'),
   applicationsController.bulkSetInterviewSchedule
+);
+
+// Excel export of a drive's applicants, filtered by status and column
+// selection (see export.service.js for the column whitelist).
+router.post(
+  '/:driveId/applications/export',
+  requireRole('ADMIN'),
+  exportController.exportApplicantsForDrive
 );
 
 module.exports = router;
