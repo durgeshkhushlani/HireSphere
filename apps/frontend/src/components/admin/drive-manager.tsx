@@ -19,12 +19,14 @@ import { ApiError } from "@/lib/api/client";
 import { listDrives, updateDriveStatus, type Drive } from "@/lib/api/drives";
 import { driveStatusStyle, type DriveStatus } from "@/lib/status";
 import { CreateDriveDialog } from "./create-drive-dialog";
+import { SearchInput } from "@/components/ui/search-input";
 
 const STATUS_OPTIONS: DriveStatus[] = ["DRAFT", "OPEN", "CLOSED"];
 
 export function DriveManager() {
   const { token } = useAuth();
   const [drives, setDrives] = useState<Drive[] | null>(null);
+  const [query, setQuery] = useState("");
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -50,9 +52,16 @@ export function DriveManager() {
     }
   }
 
+  const filtered = (drives ?? []).filter(
+    (d) =>
+      d.title.toLowerCase().includes(query.toLowerCase()) ||
+      d.company.name.toLowerCase().includes(query.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <SearchInput value={query} onChange={setQuery} placeholder="Search drives or companies…" />
         <CreateDriveDialog onCreated={refresh} />
       </div>
 
@@ -66,9 +75,13 @@ export function DriveManager() {
         <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
           No drives yet — create your first one to get started.
         </p>
+      ) : filtered.length === 0 ? (
+        <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+          No drives match &quot;{query}&quot;.
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {drives.map((drive) => {
+          {filtered.map((drive) => {
             const { style, label } = driveStatusStyle(drive.status);
             return (
               <Card key={drive.id} className="flex flex-col">

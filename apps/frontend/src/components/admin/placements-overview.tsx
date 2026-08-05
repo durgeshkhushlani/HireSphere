@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { listPlacements, type Placement } from "@/lib/api/placements";
 import { listDrives, type Drive } from "@/lib/api/drives";
+import { SearchInput } from "@/components/ui/search-input";
 
 function formatPackage(amount: string | null) {
   if (amount == null) return "—";
@@ -18,6 +19,7 @@ export function PlacementsOverview() {
   const { token } = useAuth();
   const [placements, setPlacements] = useState<Placement[] | null>(null);
   const [drives, setDrives] = useState<Drive[] | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -87,8 +89,18 @@ export function PlacementsOverview() {
           Selected.
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {placements.map((p) => (
+        <div className="flex flex-col gap-3">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search placements…" />
+          {placements
+            .filter((p) => {
+              const q = query.toLowerCase();
+              return (
+                p.user.name.toLowerCase().includes(q) ||
+                p.user.email.toLowerCase().includes(q) ||
+                p.company.name.toLowerCase().includes(q)
+              );
+            })
+            .map((p) => (
             <Card key={p.id} size="sm">
               <CardContent className="flex flex-wrap items-center justify-between gap-3">
                 <div>

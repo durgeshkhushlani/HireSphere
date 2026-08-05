@@ -22,6 +22,7 @@ import {
   linkUniversityProgram,
   type Program,
 } from "@/lib/api/universities";
+import { SearchInput } from "@/components/ui/search-input";
 
 const NEW_PROGRAM = "__new__";
 
@@ -32,6 +33,7 @@ export function ProgramsManager() {
   const [selected, setSelected] = useState("");
   const [newName, setNewName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [query, setQuery] = useState("");
 
   async function refresh() {
     if (!user) return;
@@ -133,15 +135,20 @@ export function ProgramsManager() {
           No programs added yet — students can&apos;t sign up until at least one exists.
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {linked.map((p) => (
-            <span
-              key={p.id}
-              className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold"
-            >
-              {p.name}
-            </span>
-          ))}
+        <div className="flex flex-col gap-3">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search programs…" />
+          <div className="flex flex-wrap gap-2">
+            {linked
+              .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
+              .map((p) => (
+                <span
+                  key={p.id}
+                  className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold"
+                >
+                  {p.name}
+                </span>
+              ))}
+          </div>
         </div>
       )}
     </div>

@@ -41,6 +41,7 @@ export type StudentProfile = {
 
 export type StudentRosterEntry = {
   userId: string;
+  studentId: string | null;
   cgpa: string;
   backlogCount: number;
   verified: boolean;

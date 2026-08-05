@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Building2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { driveStatusStyle } from "@/lib/status";
 import type { Drive } from "@/lib/api/drives";
+import { SearchInput } from "@/components/ui/search-input";
 import { ApplyDialog } from "./apply-dialog";
 import { DriveDetailsDialog } from "./drive-details-dialog";
 
@@ -44,6 +46,8 @@ export function DriveBrowser({
   appliedDriveIds: Set<string>;
   onApplied: () => void;
 }) {
+  const [query, setQuery] = useState("");
+
   if (drives === null) {
     return (
       <div className="grid gap-4 sm:grid-cols-2">
@@ -62,9 +66,22 @@ export function DriveBrowser({
     );
   }
 
+  const filtered = drives.filter(
+    (d) =>
+      d.title.toLowerCase().includes(query.toLowerCase()) ||
+      d.company.name.toLowerCase().includes(query.toLowerCase())
+  );
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {drives.map((drive) => {
+    <div className="flex flex-col gap-4">
+      <SearchInput value={query} onChange={setQuery} placeholder="Search drives or companies…" />
+      {filtered.length === 0 ? (
+        <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+          No drives match &quot;{query}&quot;.
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((drive) => {
         const { style, label } = driveStatusStyle(drive.status);
         const applied = appliedDriveIds.has(drive.id);
 
@@ -121,7 +138,9 @@ export function DriveBrowser({
             </CardContent>
           </Card>
         );
-      })}
+          })}
+        </div>
+      )}
     </div>
   );
 }

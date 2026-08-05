@@ -27,6 +27,7 @@ import {
   type StudentFieldType,
 } from "@/lib/api/students";
 import { StudentDetailDialog } from "./student-detail-dialog";
+import { SearchInput } from "@/components/ui/search-input";
 
 const FIELD_TYPE_LABELS: Record<StudentFieldType, string> = {
   TEXT: "Text",
@@ -186,6 +187,7 @@ function StudentRoster() {
   const [students, setStudents] = useState<StudentRosterEntry[] | null>(null);
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   async function refresh() {
     if (!token) return;
@@ -212,12 +214,24 @@ function StudentRoster() {
           No students registered yet.
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {students.map((s) => (
+        <div className="flex flex-col gap-3">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search by name or student ID…" />
+          <div className="flex flex-col gap-2">
+          {students
+            .filter((s) => {
+              const q = query.toLowerCase();
+              return (
+                s.user.name.toLowerCase().includes(q) ||
+                s.user.email.toLowerCase().includes(q) ||
+                (s.studentId ?? "").toLowerCase().includes(q)
+              );
+            })
+            .map((s) => (
             <div key={s.userId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2.5">
               <div>
                 <div className="text-sm font-bold">{s.user.name}</div>
                 <div className="text-xs text-muted-foreground">
+                  {s.studentId ? `${s.studentId} · ` : ""}
                   {s.user.email} · {s.program.name} · CGPA {s.cgpa}
                 </div>
               </div>
@@ -238,6 +252,7 @@ function StudentRoster() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 

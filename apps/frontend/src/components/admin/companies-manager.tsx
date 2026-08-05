@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { listCompanies, createCompany, updateCompany, type Company } from "@/lib/api/companies";
+import { SearchInput } from "@/components/ui/search-input";
 
 type CompanyForm = { name: string; industry: string; contactEmail: string; contactPhone: string };
 const EMPTY_FORM: CompanyForm = { name: "", industry: "", contactEmail: "", contactPhone: "" };
@@ -27,6 +28,7 @@ const EMPTY_FORM: CompanyForm = { name: "", industry: "", contactEmail: "", cont
 export function CompaniesManager() {
   const { token } = useAuth();
   const [companies, setCompanies] = useState<Company[] | null>(null);
+  const [query, setQuery] = useState("");
 
   async function refresh() {
     if (!token) return;
@@ -42,9 +44,14 @@ export function CompaniesManager() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const filtered = (companies ?? []).filter((c) =>
+    c.name.toLowerCase().includes(query.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <SearchInput value={query} onChange={setQuery} placeholder="Search companies…" />
         <CompanyDialog title="Add a company" trigger="New Company" onSaved={refresh} />
       </div>
 
@@ -58,9 +65,13 @@ export function CompaniesManager() {
         <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
           No companies yet — add one to start posting drives.
         </p>
+      ) : filtered.length === 0 ? (
+        <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+          No companies match &quot;{query}&quot;.
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {companies.map((company) => (
+          {filtered.map((company) => (
             <Card key={company.id}>
               <CardContent className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5">
