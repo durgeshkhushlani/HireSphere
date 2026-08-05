@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 
 const WORDS = ["chaotic.", "spreadsheets.", "stressful.", "simple."];
 const TYPE_MS = 60;
@@ -63,8 +64,9 @@ export function Typewriter() {
         <span className="ml-0.5 inline-block h-[0.85em] w-[3px] translate-y-1 animate-pulse bg-primary align-middle" />
       </span>
       {done && (
-        <span className="mt-2 block animate-in fade-in text-base font-bold text-accent">
-          ✓ HireSphere makes it simple.
+        <span className="mt-2 flex animate-in fade-in items-center justify-center gap-1.5 text-base font-bold text-accent">
+          <Check className="size-4 shrink-0" />
+          HireSphere makes it simple.
         </span>
       )}
     </>
