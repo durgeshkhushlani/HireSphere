@@ -9,6 +9,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { AdoptHireSphereButton } from "./adopt-hiresphere-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_LINKS = [
   { href: "#for-universities", label: "For Universities" },
@@ -39,6 +41,7 @@ export function SiteNav() {
       </div>
 
       <div className="hidden items-center gap-3 sm:flex">
+        <AdoptHireSphereButton />
         <Button variant="outline" nativeButton={false} render={<Link href="/demo" />}>
           Try it out
         </Button>
@@ -52,13 +55,16 @@ export function SiteNav() {
         >
           Get started
         </Button>
+        <ThemeToggle />
       </div>
 
-      <Sheet>
-        <SheetTrigger render={<Button variant="ghost" size="icon" className="sm:hidden" />}>
-          <Menu className="size-5" />
-        </SheetTrigger>
-        <SheetContent side="right">
+      <div className="flex items-center gap-2 sm:hidden">
+        <ThemeToggle />
+        <Sheet>
+          <SheetTrigger render={<Button variant="ghost" size="icon" />}>
+            <Menu className="size-5" />
+          </SheetTrigger>
+          <SheetContent side="right">
           <SheetHeader>
             <SheetTitle className="font-heading">HireSphere</SheetTitle>
           </SheetHeader>
@@ -73,6 +79,7 @@ export function SiteNav() {
               </a>
             ))}
             <div className="mt-4 flex flex-col gap-2 border-t pt-4">
+              <AdoptHireSphereButton className="w-full" />
               <Button variant="outline" nativeButton={false} render={<Link href="/demo" />}>
                 Try it out
               </Button>
@@ -92,8 +99,9 @@ export function SiteNav() {
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+      </div>
     </nav>
   );
 }
