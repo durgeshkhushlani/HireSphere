@@ -7,6 +7,7 @@ import { PlacementsOverview } from "./placements-overview";
 import { ProgramsManager } from "./programs-manager";
 import { CompaniesManager } from "./companies-manager";
 import { StudentsManager } from "./students-manager";
+import { NotificationsManager } from "./notifications-manager";
 
 const TAB_TRIGGER_CLASS =
   "rounded-full border border-border bg-card px-4 shadow-sm data-active:border-transparent data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-foreground dark:data-active:text-background dark:data-active:hover:text-background";
@@ -27,6 +28,7 @@ export function AdminDashboard() {
           <TabsTrigger value="programs" className={TAB_TRIGGER_CLASS}>Programs</TabsTrigger>
           <TabsTrigger value="companies" className={TAB_TRIGGER_CLASS}>Companies</TabsTrigger>
           <TabsTrigger value="students" className={TAB_TRIGGER_CLASS}>Students</TabsTrigger>
+          <TabsTrigger value="notifications" className={TAB_TRIGGER_CLASS}>Notifications</TabsTrigger>
         </TabsList>
         <TabsContent value="drives" className="mt-6">
           <DriveManager />
@@ -45,6 +47,9 @@ export function AdminDashboard() {
         </TabsContent>
         <TabsContent value="students" className="mt-6">
           <StudentsManager />
+        </TabsContent>
+        <TabsContent value="notifications" className="mt-6">
+          <NotificationsManager />
         </TabsContent>
       </Tabs>
     </div>

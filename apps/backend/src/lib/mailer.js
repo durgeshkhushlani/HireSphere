@@ -17,7 +17,11 @@ function buildTransport() {
 
 const transport = buildTransport();
 
-async function sendMail({ to, subject, text }) {
+// `bcc` is for sending one message to several recipients without exposing
+// their addresses to each other (used by notifications.service.js's
+// distribution lists) — `to` stays optional in that case since nodemailer
+// only requires at least one of to/cc/bcc to be set.
+async function sendMail({ to, bcc, subject, text }) {
   // Fail fast with a normal, catchable rejection instead of letting
   // nodemailer attempt the Gmail connection: an auth failure there surfaces
   // as an unhandled error event on the underlying SMTP socket rather than a
@@ -29,6 +33,7 @@ async function sendMail({ to, subject, text }) {
   const info = await transport.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
+    bcc,
     subject,
     text,
   });
@@ -42,4 +47,10 @@ function getLastTestMessage() {
   return lastTestMessage;
 }
 
-module.exports = { sendMail, getLastTestMessage };
+// Test-only — lets a test assert "nothing was sent" instead of only being
+// able to inspect the last message an earlier test happened to leave behind.
+function _resetLastTestMessage() {
+  lastTestMessage = null;
+}
+
+module.exports = { sendMail, getLastTestMessage, _resetLastTestMessage };

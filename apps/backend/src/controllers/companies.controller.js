@@ -9,7 +9,7 @@ async function getById(req, res) {
 }
 
 async function create(req, res) {
-  res.status(201).json(await companiesService.create(req.body));
+  res.status(201).json(await companiesService.create(req.body, req.user.universityId));
 }
 
 async function update(req, res) {
