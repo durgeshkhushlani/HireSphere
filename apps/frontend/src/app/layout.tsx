@@ -3,6 +3,7 @@ import { Manrope, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
+import { BugReportButton } from "@/components/bug-report/bug-report-button";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -36,6 +37,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <Toaster position="top-center" richColors />
+          <BugReportButton />
         </AuthProvider>
       </body>
     </html>
