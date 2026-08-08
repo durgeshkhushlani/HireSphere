@@ -172,22 +172,26 @@ export function StudentProfileDialog({
                     No resume on file — required before you can apply to any drive.
                   </p>
                 )}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={uploadingResume}
-                  onClick={() => resumeInputRef.current?.click()}
-                >
-                  <Upload /> {uploadingResume ? "Uploading…" : profile.resumeUrl ? "Update" : "Upload"}
-                </Button>
-                <input
-                  ref={resumeInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handleResumeSelected}
-                />
+                {editing && (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={uploadingResume}
+                      onClick={() => resumeInputRef.current?.click()}
+                    >
+                      <Upload /> {uploadingResume ? "Uploading…" : profile.resumeUrl ? "Update" : "Upload"}
+                    </Button>
+                    <input
+                      ref={resumeInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={handleResumeSelected}
+                    />
+                  </>
+                )}
               </div>
             </div>
 
