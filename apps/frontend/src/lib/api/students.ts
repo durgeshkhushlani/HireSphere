@@ -33,6 +33,7 @@ export type StudentProfile = {
   bloodGroup: string | null;
   address: string | null;
   phone: string | null;
+  resumeUrl: string | null;
   verified: boolean;
   user: { id: string; name: string; email: string; university: { id: string; name: string } };
   program: { id: string; name: string };
@@ -49,6 +50,21 @@ export type StudentRosterEntry = {
   program: { id: string; name: string };
 };
 
+export type ResumeUploadSignature = {
+  signature: string;
+  timestamp: number;
+  publicId: string;
+  apiKey: string;
+  cloudName: string;
+};
+
+export function getResumeUploadSignature(token: string) {
+  return apiFetch<ResumeUploadSignature>("/students/me/resume-upload-signature", {
+    method: "POST",
+    token,
+  });
+}
+
 export function getMyProfile(token: string) {
   return apiFetch<StudentProfile>("/students/me", { token });
 }
@@ -61,6 +77,7 @@ export function updateMyProfile(
     bloodGroup?: string | null;
     address?: string | null;
     phone?: string | null;
+    resumeUrl?: string | null;
     customFieldValues?: Record<string, string>;
   },
   token: string

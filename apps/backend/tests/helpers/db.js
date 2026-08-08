@@ -9,6 +9,7 @@ const TABLES = [
   'applications',
   'application_forms',
   'drive_eligible_programs',
+  'drive_company_access',
   'drive_roles',
   'drives',
   'student_custom_field_values',
@@ -18,6 +19,7 @@ const TABLES = [
   'university_programs',
   'programs',
   'companies',
+  'notification_recipients',
   'universities',
 ];
 

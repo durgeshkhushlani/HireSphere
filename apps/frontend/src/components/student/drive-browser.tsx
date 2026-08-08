@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { driveStatusStyle } from "@/lib/status";
 import type { Drive } from "@/lib/api/drives";
 import { SearchInput } from "@/components/ui/search-input";
+import { useUniversityTimezone } from "@/lib/use-university-timezone";
+import { formatInZone } from "@/lib/timezone";
 import { ApplyDialog } from "./apply-dialog";
 import { DriveDetailsDialog } from "./drive-details-dialog";
 
@@ -47,6 +49,7 @@ export function DriveBrowser({
   onApplied: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const timezone = useUniversityTimezone();
 
   if (drives === null) {
     return (
@@ -122,7 +125,20 @@ export function DriveBrowser({
                     Max {drive.maxBacklogs} backlog(s)
                   </span>
                 )}
+                {drive.resultsDeclared && (
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">
+                    Results declared
+                  </span>
+                )}
               </div>
+              {(drive.openedAt || drive.autoCloseAt) && (
+                <div className="text-xs text-muted-foreground">
+                  {drive.openedAt && <div>Opened {formatInZone(drive.openedAt, timezone)}</div>}
+                  {drive.autoCloseAt && (
+                    <div>Closes {formatInZone(drive.autoCloseAt, timezone)}</div>
+                  )}
+                </div>
+              )}
               <div className="mt-auto flex items-center gap-2 pt-2">
                 <DriveDetailsDialog drive={drive} />
                 {applied ? (

@@ -11,7 +11,13 @@ import { SearchInput } from "@/components/ui/search-input";
 import type { Application } from "@/lib/api/applications";
 import { StudentApplicationDetailDialog } from "./student-application-detail-dialog";
 
-export function MyApplications({ applications }: { applications: Application[] | null }) {
+export function MyApplications({
+  applications,
+  onChanged,
+}: {
+  applications: Application[] | null;
+  onChanged: () => void;
+}) {
   const timezone = useUniversityTimezone();
   const [query, setQuery] = useState("");
   const [detailApp, setDetailApp] = useState<Application | null>(null);
@@ -95,6 +101,7 @@ export function MyApplications({ applications }: { applications: Application[] |
         application={detailApp}
         open={detailApp !== null}
         onOpenChange={(open) => !open && setDetailApp(null)}
+        onChanged={onChanged}
       />
     </div>
   );

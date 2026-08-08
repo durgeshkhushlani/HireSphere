@@ -63,7 +63,7 @@ export function StudentDashboard() {
           <DriveBrowser drives={drives} appliedDriveIds={appliedDriveIds} onApplied={refresh} />
         </TabsContent>
         <TabsContent value="applications" className="mt-6">
-          <MyApplications applications={applications} />
+          <MyApplications applications={applications} onChanged={refresh} />
         </TabsContent>
       </Tabs>
     </div>

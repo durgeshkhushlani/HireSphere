@@ -1,6 +1,6 @@
 const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { resetDb, disconnect } = require('./helpers/db');
+const { resetDb, disconnect, prisma } = require('./helpers/db');
 const {
   api,
   auth,
@@ -8,8 +8,10 @@ const {
   createCompany,
   createDrive,
   registerAdmin,
+  registerStudent,
   seedScenario,
 } = require('./helpers/factories');
+const { autoCloseDueDrives } = require('../src/jobs/autoCloseDispatcher');
 
 beforeEach(resetDb);
 after(disconnect);
@@ -56,6 +58,31 @@ describe('GET /api/drives', () => {
     const res = await api().get(`/api/drives/${foreignDrive.id}`).set(...auth(mine.admin.token));
 
     assert.equal(res.status, 404);
+  });
+
+  test('includes results in the list once declared, and omits them otherwise', async () => {
+    const { admin, student, drive } = await seedScenario({ drive: { status: 'OPEN' } });
+    const applied = await api()
+      .post(`/api/drives/${drive.id}/applications`)
+      .set(...auth(student.token))
+      .send({ responses: {} });
+    await api()
+      .patch(`/api/applications/${applied.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'SELECTED' });
+    await api()
+      .patch(`/api/drives/${drive.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'CLOSED' });
+
+    const beforeDeclare = await api().get('/api/drives').set(...auth(student.token));
+    assert.equal(beforeDeclare.body[0].results, undefined);
+
+    await api().patch(`/api/drives/${drive.id}/declare-results`).set(...auth(admin.token));
+
+    const afterDeclare = await api().get('/api/drives').set(...auth(student.token));
+    assert.equal(afterDeclare.body[0].results.length, 1);
+    assert.equal(afterDeclare.body[0].results[0].name, 'Test Student');
   });
 });
 
@@ -285,5 +312,211 @@ describe('application form', () => {
       .send({ questions: 'not an array' });
 
     assert.equal(res.status, 400);
+  });
+});
+
+describe('PATCH /api/drives/:id/declare-results', () => {
+  const applyTo = (driveId, token) =>
+    api()
+      .post(`/api/drives/${driveId}/applications`)
+      .set(...auth(token))
+      .send({ responses: {} });
+
+  const declareResults = (driveId, token) =>
+    api()
+      .patch(`/api/drives/${driveId}/declare-results`)
+      .set(...auth(token));
+
+  test('requires the drive to be CLOSED first', async () => {
+    const { admin, drive } = await seedScenario({ drive: { status: 'OPEN' } });
+
+    const res = await declareResults(drive.id, admin.token);
+
+    assert.equal(res.status, 400);
+  });
+
+  test('lets an admin declare results once the drive is closed', async () => {
+    const { admin, drive } = await seedScenario({ drive: { status: 'CLOSED' } });
+
+    const res = await declareResults(drive.id, admin.token);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.resultsDeclared, true);
+    assert.ok(res.body.resultsDeclaredAt);
+  });
+
+  test('rejects declaring twice', async () => {
+    const { admin, drive } = await seedScenario({ drive: { status: 'CLOSED' } });
+    await declareResults(drive.id, admin.token);
+
+    const res = await declareResults(drive.id, admin.token);
+
+    assert.equal(res.status, 409);
+  });
+
+  test('forbids a student', async () => {
+    const { student, drive } = await seedScenario({ drive: { status: 'CLOSED' } });
+
+    const res = await declareResults(drive.id, student.token);
+
+    assert.equal(res.status, 403);
+  });
+
+  test('cannot declare results for a drive belonging to another university', async () => {
+    const mine = await seedScenario({ drive: { status: 'CLOSED' } });
+    const other = await seedScenario();
+
+    const res = await declareResults(mine.drive.id, other.admin.token);
+
+    assert.equal(res.status, 404);
+  });
+
+  test('results stay hidden until declared, then are visible to any student — name and studentId only', async () => {
+    const { university, program, admin, student, drive } = await seedScenario({
+      drive: { status: 'OPEN' },
+    });
+    const applied = await applyTo(drive.id, student.token);
+    await api()
+      .patch(`/api/applications/${applied.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'SELECTED' });
+    await api()
+      .patch(`/api/drives/${drive.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'CLOSED' });
+
+    const beforeDeclare = await api().get(`/api/drives/${drive.id}`).set(...auth(student.token));
+    assert.equal(beforeDeclare.body.results, undefined);
+
+    await declareResults(drive.id, admin.token);
+
+    // A different student who never applied should still be able to see it.
+    const bystander = await registerStudent(university.id, program.id);
+    const afterDeclare = await api()
+      .get(`/api/drives/${drive.id}`)
+      .set(...auth(bystander.token));
+
+    assert.equal(afterDeclare.status, 200);
+    assert.equal(afterDeclare.body.results.length, 1);
+    assert.deepEqual(Object.keys(afterDeclare.body.results[0]).sort(), ['name', 'studentId']);
+    assert.equal(afterDeclare.body.results[0].name, 'Test Student');
+  });
+});
+
+describe('openedAt', () => {
+  test('is null until the drive is opened, then stamped', async () => {
+    const { admin, drive } = await seedScenario({ drive: { status: 'DRAFT' } });
+
+    const before = await api().get(`/api/drives/${drive.id}`).set(...auth(admin.token));
+    assert.equal(before.body.openedAt, null);
+
+    const after = await api()
+      .patch(`/api/drives/${drive.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'OPEN' });
+
+    assert.ok(after.body.openedAt);
+  });
+});
+
+describe('PATCH /api/drives/:id/auto-close', () => {
+  const setAutoClose = (driveId, token, autoCloseAt) =>
+    api()
+      .patch(`/api/drives/${driveId}/auto-close`)
+      .set(...auth(token))
+      .send({ autoCloseAt });
+
+  test('an admin can schedule an auto-close time', async () => {
+    const { admin, drive } = await seedScenario();
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const res = await setAutoClose(drive.id, admin.token, future);
+
+    assert.equal(res.status, 200);
+    assert.equal(new Date(res.body.autoCloseAt).toISOString(), future);
+  });
+
+  test('an admin can clear a scheduled auto-close by passing null', async () => {
+    const { admin, drive } = await seedScenario();
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await setAutoClose(drive.id, admin.token, future);
+
+    const res = await setAutoClose(drive.id, admin.token, null);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.autoCloseAt, null);
+  });
+
+  test('rejects a past date', async () => {
+    const { admin, drive } = await seedScenario();
+    const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    const res = await setAutoClose(drive.id, admin.token, past);
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects an invalid date string', async () => {
+    const { admin, drive } = await seedScenario();
+
+    const res = await setAutoClose(drive.id, admin.token, 'not-a-date');
+
+    assert.equal(res.status, 400);
+  });
+
+  test('forbids a student', async () => {
+    const { student, drive } = await seedScenario();
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const res = await setAutoClose(drive.id, student.token, future);
+
+    assert.equal(res.status, 403);
+  });
+
+  test('404s for a drive belonging to another university', async () => {
+    const mine = await seedScenario();
+    const other = await seedScenario();
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const res = await setAutoClose(mine.drive.id, other.admin.token, future);
+
+    assert.equal(res.status, 404);
+  });
+});
+
+describe('autoCloseDueDrives (poller)', () => {
+  test('closes an OPEN drive whose auto-close time has passed', async () => {
+    const { drive } = await seedScenario({ drive: { status: 'OPEN' } });
+    await prisma.drive.update({
+      where: { id: drive.id },
+      data: { autoCloseAt: new Date(Date.now() - 1000) },
+    });
+
+    await autoCloseDueDrives();
+
+    const updated = await prisma.drive.findUnique({ where: { id: drive.id } });
+    assert.equal(updated.status, 'CLOSED');
+  });
+
+  test('does not close a drive whose auto-close time is in the future', async () => {
+    const { drive } = await seedScenario({ drive: { status: 'OPEN' } });
+    await prisma.drive.update({
+      where: { id: drive.id },
+      data: { autoCloseAt: new Date(Date.now() + 60 * 60 * 1000) },
+    });
+
+    await autoCloseDueDrives();
+
+    const updated = await prisma.drive.findUnique({ where: { id: drive.id } });
+    assert.equal(updated.status, 'OPEN');
+  });
+
+  test('does not touch a drive with no auto-close time set', async () => {
+    const { drive } = await seedScenario({ drive: { status: 'OPEN' } });
+
+    await autoCloseDueDrives();
+
+    const updated = await prisma.drive.findUnique({ where: { id: drive.id } });
+    assert.equal(updated.status, 'OPEN');
   });
 });

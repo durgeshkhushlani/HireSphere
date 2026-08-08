@@ -6,7 +6,6 @@ async function applyToDrive(req, res) {
     universityId: req.user.universityId,
     studentProfileId: req.user.id,
     responses: req.body.responses,
-    resumeUrl: req.body.resumeUrl,
     rolePreferences: req.body.rolePreferences,
   });
   res.status(201).json(application);
@@ -24,11 +23,26 @@ async function getById(req, res) {
   res.json(await applicationsService.getForUser(req.params.id, req.user));
 }
 
+async function withdraw(req, res) {
+  await applicationsService.withdraw(req.params.id, req.user.id);
+  res.status(204).end();
+}
+
+async function updateMyApplication(req, res) {
+  const application = await applicationsService.updateMyApplication(req.params.id, req.user.id, {
+    responses: req.body.responses,
+    rolePreferences: req.body.rolePreferences,
+  });
+  res.json(application);
+}
+
 async function updateStatus(req, res) {
+  const callerDriveId = req.user.role === 'COMPANY' ? req.user.driveId : undefined;
   const application = await applicationsService.updateStatus(
     req.params.id,
     req.user.universityId,
-    req.body
+    req.body,
+    callerDriveId
   );
   res.json(application);
 }
@@ -56,6 +70,8 @@ module.exports = {
   listForDrive,
   listMine,
   getById,
+  withdraw,
+  updateMyApplication,
   updateStatus,
   bulkSetInterviewSchedule,
   scheduleResumeDelivery,

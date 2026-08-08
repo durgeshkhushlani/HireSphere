@@ -1,5 +1,6 @@
 const studentsService = require('../services/students.service');
 const studentFieldsService = require('../services/student-fields.service');
+const { generateResumeUploadSignature } = require('../lib/cloudinary');
 
 async function getMe(req, res) {
   res.json(await studentsService.getFullProfile(req.user.id));
@@ -7,6 +8,10 @@ async function getMe(req, res) {
 
 async function updateMe(req, res) {
   res.json(await studentsService.updateProfile(req.user.id, req.body));
+}
+
+async function getResumeUploadSignature(req, res) {
+  res.json(generateResumeUploadSignature(req.user.id));
 }
 
 async function list(req, res) {
@@ -43,6 +48,7 @@ async function deleteFieldDefinition(req, res) {
 module.exports = {
   getMe,
   updateMe,
+  getResumeUploadSignature,
   list,
   getById,
   setVerified,

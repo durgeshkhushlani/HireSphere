@@ -9,6 +9,11 @@ router.use(requireAuth);
 
 router.get('/me', requireRole('STUDENT'), studentsController.getMe);
 router.patch('/me', requireRole('STUDENT'), studentsController.updateMe);
+router.post(
+  '/me/resume-upload-signature',
+  requireRole('STUDENT'),
+  studentsController.getResumeUploadSignature
+);
 
 // Both roles: a student needs to know which fields to fill in, an admin
 // needs to manage them. Write operations stay admin-only.

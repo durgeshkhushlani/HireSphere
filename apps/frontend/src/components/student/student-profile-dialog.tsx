@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { FileText, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { getMyProfile, updateMyProfile, type StudentProfile } from "@/lib/api/students";
+import { uploadResumeToCloudinary } from "@/lib/cloudinary-upload";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -52,6 +54,8 @@ export function StudentProfileDialog({
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
 
   function syncFormState(p: StudentProfile) {
     setProfile(p);
@@ -106,6 +110,27 @@ export function StudentProfileDialog({
     }
   }
 
+  async function handleResumeSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !token) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Resume must be a PDF");
+      return;
+    }
+    setUploadingResume(true);
+    try {
+      const url = await uploadResumeToCloudinary(file, token);
+      const updated = await updateMyProfile({ resumeUrl: url }, token);
+      syncFormState(updated);
+      toast.success("Resume updated");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't upload resume");
+    } finally {
+      setUploadingResume(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -128,6 +153,42 @@ export function StudentProfileDialog({
               <Field label="University" value={profile.user.university.name} />
               <Field label="CGPA" value={profile.cgpa} />
               <Field label="Backlogs" value={profile.backlogCount} />
+            </div>
+
+            <div className="rounded-lg border p-3">
+              <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">Resume</Label>
+              <div className="flex items-center justify-between gap-3">
+                {profile.resumeUrl ? (
+                  <a
+                    href={profile.resumeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 text-sm font-semibold text-primary underline underline-offset-2"
+                  >
+                    <FileText className="size-4" /> View current resume ↗
+                  </a>
+                ) : (
+                  <p className="text-xs text-destructive">
+                    No resume on file — required before you can apply to any drive.
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={uploadingResume}
+                  onClick={() => resumeInputRef.current?.click()}
+                >
+                  <Upload /> {uploadingResume ? "Uploading…" : profile.resumeUrl ? "Update" : "Upload"}
+                </Button>
+                <input
+                  ref={resumeInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={handleResumeSelected}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -12,11 +12,15 @@ const { dispatchDueResumes } = require('../src/jobs/resumeDispatcher');
 beforeEach(resetDb);
 after(disconnect);
 
-const applyWithResume = (driveId, token, resumeUrl = 'https://example.com/cv.pdf') =>
+// resumeUrl is no longer request-supplied — it's snapshotted from whatever
+// the student's profile has on file at apply time (see
+// applications.service.js's applyToDrive), which seedScenario now defaults
+// to 'https://example.com/resume.pdf' unless overridden.
+const applyWithResume = (driveId, token) =>
   api()
     .post(`/api/drives/${driveId}/applications`)
     .set(...auth(token))
-    .send({ responses: {}, resumeUrl });
+    .send({ responses: {} });
 
 const scheduleResume = (id, token, body) =>
   api()
@@ -52,11 +56,15 @@ describe('PATCH /api/applications/:id/schedule-resume', () => {
   });
 
   test('rejects when the application has no resumeUrl', async () => {
+    // Applying now always requires (and snapshots) a resume, so this state
+    // can only arise from data that predates that requirement — simulated
+    // here by nulling it out directly rather than through the apply endpoint.
     const { admin, student, drive } = await seedScenario();
-    const created = await api()
-      .post(`/api/drives/${drive.id}/applications`)
-      .set(...auth(student.token))
-      .send({ responses: {} });
+    const created = await applyWithResume(drive.id, student.token);
+    await prisma.application.update({
+      where: { id: created.body.id },
+      data: { resumeUrl: null },
+    });
 
     const res = await scheduleResume(created.body.id, admin.token, {
       dispatchAt: '2099-01-01T00:00:00.000Z',
@@ -106,7 +114,9 @@ describe('PATCH /api/applications/:id/schedule-resume', () => {
 
 describe('dispatchDueResumes', () => {
   test('sends an email and marks resumeSentAt for a due, unsent application', async () => {
-    const { admin, student, drive } = await seedScenario();
+    const { admin, student, drive } = await seedScenario({
+      student: { resumeUrl: 'https://example.com/cv.pdf' },
+    });
     await prisma.drive.update({
       where: { id: drive.id },
       data: { company: { update: { contactEmail: 'hr@company.com' } } },

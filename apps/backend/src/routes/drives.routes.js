@@ -4,16 +4,26 @@ const applicationsController = require('../controllers/applications.controller')
 const exportController = require('../controllers/export.controller');
 const requireAuth = require('../middleware/requireAuth');
 const requireRole = require('../middleware/requireRole');
+const restrictCompanyToOwnDrive = require('../middleware/restrictCompanyToOwnDrive');
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-router.get('/', drivesController.list);
-router.get('/:id', drivesController.getById);
+// A company-portal caller never lists the whole university's drives — only
+// their own, via GET /:id below.
+router.get('/', requireRole('ADMIN', 'STUDENT'), drivesController.list);
+router.get('/:id', restrictCompanyToOwnDrive('id'), drivesController.getById);
 router.post('/', requireRole('ADMIN'), drivesController.create);
 router.patch('/:id/details', requireRole('ADMIN'), drivesController.updateDetails);
 router.patch('/:id/status', requireRole('ADMIN'), drivesController.updateStatus);
+router.patch('/:id/declare-results', requireRole('ADMIN'), drivesController.declareResults);
+router.patch('/:id/auto-close', requireRole('ADMIN'), drivesController.setAutoClose);
+router.patch(
+  '/:id/company-access/regenerate',
+  requireRole('ADMIN'),
+  drivesController.regenerateCompanyAccess
+);
 
 // Per-drive application form (the question set students answer).
 router.get('/:driveId/application-form', drivesController.getApplicationForm);
@@ -37,7 +47,12 @@ router.put('/:driveId/roles', requireRole('ADMIN'), drivesController.setRoles);
 
 // Applications nested under a drive.
 router.post('/:driveId/applications', requireRole('STUDENT'), applicationsController.applyToDrive);
-router.get('/:driveId/applications', requireRole('ADMIN'), applicationsController.listForDrive);
+router.get(
+  '/:driveId/applications',
+  requireRole('ADMIN', 'COMPANY'),
+  restrictCompanyToOwnDrive('driveId'),
+  applicationsController.listForDrive
+);
 
 // Global apply toggle (plan §4): same interview slot/venue across a chosen
 // batch of applications for this drive in one call.

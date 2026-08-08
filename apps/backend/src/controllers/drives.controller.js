@@ -1,11 +1,20 @@
 const drivesService = require('../services/drives.service');
+const companyPortalService = require('../services/company-portal.service');
 
 async function list(req, res) {
   res.json(await drivesService.listForUniversity(req.user.universityId));
 }
 
 async function getById(req, res) {
-  res.json(await drivesService.getForUniversity(req.params.id, req.user.universityId));
+  const drive = await drivesService.getForUniversity(req.params.id, req.user.universityId);
+  // The access code (not the password/hash) is only meaningful to an admin
+  // building/sharing the company-portal link — never sent to a student or
+  // to the company caller viewing their own drive.
+  if (req.user.role === 'ADMIN') {
+    const companyAccess = await companyPortalService.getAccessInfo(drive.id);
+    return res.json({ ...drive, companyAccess });
+  }
+  res.json(drive);
 }
 
 async function create(req, res) {
@@ -24,6 +33,29 @@ async function updateStatus(req, res) {
     req.body.status
   );
   res.json(drive);
+}
+
+async function declareResults(req, res) {
+  const drive = await drivesService.declareResults(req.params.id, req.user.universityId);
+  res.json(drive);
+}
+
+async function setAutoClose(req, res) {
+  const drive = await drivesService.setAutoClose(
+    req.params.id,
+    req.user.universityId,
+    req.body.autoCloseAt
+  );
+  res.json(drive);
+}
+
+async function regenerateCompanyAccess(req, res) {
+  const result = await companyPortalService.regenerateAndSend(
+    req.params.id,
+    req.user.universityId,
+    req.body.emails
+  );
+  res.json(result);
 }
 
 async function getApplicationForm(req, res) {
@@ -67,6 +99,9 @@ module.exports = {
   create,
   updateDetails,
   updateStatus,
+  declareResults,
+  setAutoClose,
+  regenerateCompanyAccess,
   getApplicationForm,
   setApplicationForm,
   getEligiblePrograms,

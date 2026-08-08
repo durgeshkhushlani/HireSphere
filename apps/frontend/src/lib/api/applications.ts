@@ -26,6 +26,27 @@ export function listMyApplications(token: string) {
   return apiFetch<Application[]>("/applications/me", { token });
 }
 
+// Only allowed while status is APPLIED and the drive is still OPEN
+// (enforced server-side) — deletes the application row entirely rather
+// than a WITHDRAWN status, so a clean re-apply is possible afterward.
+export function withdrawApplication(id: string, token: string) {
+  return apiFetch<void>(`/applications/${id}`, { method: "DELETE", token });
+}
+
+// responses/rolePreferences are each independently optional. Same
+// APPLIED + drive-OPEN gate as withdraw.
+export function updateMyApplication(
+  id: string,
+  input: { responses?: Record<string, string>; rolePreferences?: string[] },
+  token: string
+) {
+  return apiFetch<Application>(`/applications/${id}`, {
+    method: "PATCH",
+    body: input,
+    token,
+  });
+}
+
 export type ApplicantEntry = {
   id: string;
   driveId: string;

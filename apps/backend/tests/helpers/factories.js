@@ -69,6 +69,11 @@ async function registerStudent(universityId, programId, overrides = {}) {
   const verificationToken =
     overrides.verificationToken || (await requestAndVerifyOtp(email));
 
+  // resumeUrl isn't part of registration itself (set via PATCH /students/me,
+  // same as every other profile field) — pulled out of overrides here so it
+  // doesn't leak into the registration request body.
+  const { resumeUrl, ...registrationOverrides } = overrides;
+
   const res = await api()
     .post('/api/auth/register/student')
     .send({
@@ -78,8 +83,20 @@ async function registerStudent(universityId, programId, overrides = {}) {
       password: 'secret123',
       name: 'Test Student',
       cgpa: 8.5,
-      ...overrides,
+      ...registrationOverrides,
     });
+
+  // Applying to a drive now requires a resume on file — default one here so
+  // the many existing tests that register-then-apply don't all need
+  // updating individually. Pass `resumeUrl: null` to opt out (e.g. testing
+  // the "no resume" rejection itself).
+  if (resumeUrl !== null && res.body.user) {
+    await prisma.studentProfile.update({
+      where: { userId: res.body.user.id },
+      data: { resumeUrl: resumeUrl || 'https://example.com/resume.pdf' },
+    });
+  }
+
   return { token: res.body.token, user: res.body.user, res };
 }
 

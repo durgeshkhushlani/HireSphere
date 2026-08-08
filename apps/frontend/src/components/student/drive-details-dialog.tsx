@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Drive } from "@/lib/api/drives";
+import { useUniversityTimezone } from "@/lib/use-university-timezone";
+import { formatInZone } from "@/lib/timezone";
 
 function formatAmount(amount: string | null, suffix: string) {
   if (amount == null) return null;
@@ -25,6 +27,7 @@ function formatAmount(amount: string | null, suffix: string) {
 }
 
 export function DriveDetailsDialog({ drive }: { drive: Drive }) {
+  const timezone = useUniversityTimezone();
   const [selectedRoleId, setSelectedRoleId] = useState(drive.roles[0]?.id ?? "");
   const selectedRole = drive.roles.find((r) => r.id === selectedRoleId) ?? drive.roles[0];
 
@@ -40,6 +43,23 @@ export function DriveDetailsDialog({ drive }: { drive: Drive }) {
         <div className="flex flex-col gap-4">
           {drive.description && (
             <p className="text-sm text-muted-foreground">{drive.description}</p>
+          )}
+
+          {(drive.openedAt || drive.autoCloseAt) && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground">Opens</div>
+                <div className="text-sm">
+                  {drive.openedAt ? formatInZone(drive.openedAt, timezone) : "Not opened yet"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground">Closes</div>
+                <div className="text-sm">
+                  {drive.autoCloseAt ? formatInZone(drive.autoCloseAt, timezone) : "No scheduled close"}
+                </div>
+              </div>
+            </div>
           )}
 
           {drive.roles.length === 0 ? (
@@ -85,6 +105,24 @@ export function DriveDetailsDialog({ drive }: { drive: Drive }) {
                 </div>
               )}
             </>
+          )}
+
+          {drive.resultsDeclared && (
+            <div>
+              <div className="mb-2 text-xs font-semibold text-muted-foreground">Results</div>
+              {drive.results && drive.results.length > 0 ? (
+                <ul className="list-inside list-disc text-sm">
+                  {drive.results.map((r, i) => (
+                    <li key={i}>
+                      {r.name}
+                      {r.studentId ? ` (${r.studentId})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No students were selected.</p>
+              )}
+            </div>
           )}
         </div>
       </DialogContent>

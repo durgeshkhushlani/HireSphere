@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
+import { getMe } from "@/lib/api/auth";
 import { listUniversityPrograms, type Program } from "@/lib/api/universities";
 import {
   getDrive,
@@ -23,10 +24,15 @@ import {
   setApplicationForm,
   setEligiblePrograms,
   setDriveRoles,
+  declareDriveResults,
+  setDriveAutoClose,
   type Drive,
   type OfferType,
   type ApplicationFormQuestion,
 } from "@/lib/api/drives";
+import { CompanyPortalCard } from "./company-portal-card";
+import { useUniversityTimezone } from "@/lib/use-university-timezone";
+import { formatInZone, isoToZonedDatetimeLocal, zonedDatetimeLocalToIso } from "@/lib/timezone";
 
 let seq = 0;
 function nextKey() {
@@ -55,12 +61,18 @@ function formatAmount(amount: string | null, suffix: string) {
 export function DriveDetailsManager({ driveId }: { driveId: string }) {
   const { token, user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const timezone = useUniversityTimezone();
 
   const [drive, setDrive] = useState<Drive | null>(null);
+  const [universityDomain, setUniversityDomain] = useState<string | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [declaring, setDeclaring] = useState(false);
+  const [autoCloseEnabled, setAutoCloseEnabled] = useState(false);
+  const [autoCloseInput, setAutoCloseInput] = useState("");
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -90,12 +102,16 @@ export function DriveDetailsManager({ driveId }: { driveId: string }) {
       } catch (err) {
         if (!(err instanceof ApiError && err.status === 404)) throw err;
       }
-      const [d, eligible, allPrograms] = await Promise.all([
+      const [d, eligible, allPrograms, me] = await Promise.all([
         getDrive(driveId, token),
         getEligiblePrograms(driveId, token),
         listUniversityPrograms(user.universityId),
+        getMe(token),
       ]);
       setDrive(d);
+      setUniversityDomain(me.university.domain);
+      setAutoCloseEnabled(d.autoCloseAt != null);
+      setAutoCloseInput(d.autoCloseAt ? isoToZonedDatetimeLocal(d.autoCloseAt, timezone) : "");
       setTitle(d.title);
       setDescription(d.description ?? "");
       setMinCgpa(d.minCgpa ?? "");
@@ -217,6 +233,42 @@ export function DriveDetailsManager({ driveId }: { driveId: string }) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't save drive details");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeclareResults() {
+    if (!token) return;
+    setDeclaring(true);
+    try {
+      await declareDriveResults(driveId, token);
+      toast.success("Results declared — visible to every student now");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't declare results");
+    } finally {
+      setDeclaring(false);
+    }
+  }
+
+  async function handleSaveSchedule() {
+    if (!token) return;
+    if (autoCloseEnabled && !autoCloseInput) {
+      toast.error("Pick a date and time for auto-close, or turn the toggle off");
+      return;
+    }
+    setSavingSchedule(true);
+    try {
+      await setDriveAutoClose(
+        driveId,
+        autoCloseEnabled ? zonedDatetimeLocalToIso(autoCloseInput, timezone) : null,
+        token
+      );
+      toast.success(autoCloseEnabled ? "Auto-close scheduled" : "Auto-close disabled");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't update the schedule");
+    } finally {
+      setSavingSchedule(false);
     }
   }
 
@@ -485,6 +537,103 @@ export function DriveDetailsManager({ driveId }: { driveId: string }) {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="text-sm font-bold">Schedule</div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground">Opened</div>
+                      <div className="text-sm">
+                        {drive.openedAt ? formatInZone(drive.openedAt, timezone) : "Not opened yet"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground">Auto-close</div>
+                      <div className="text-sm">
+                        {drive.autoCloseAt ? formatInZone(drive.autoCloseAt, timezone) : "Not scheduled"}
+                      </div>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={autoCloseEnabled}
+                      onChange={(e) => setAutoCloseEnabled(e.target.checked)}
+                      className="size-4 rounded border-input"
+                    />
+                    Auto-close this drive at a scheduled date and time
+                  </label>
+                  {autoCloseEnabled && (
+                    <Input
+                      type="datetime-local"
+                      value={autoCloseInput}
+                      onChange={(e) => setAutoCloseInput(e.target.value)}
+                      className="w-[220px]"
+                    />
+                  )}
+                  <Button
+                    size="sm"
+                    className="self-start"
+                    disabled={savingSchedule}
+                    onClick={handleSaveSchedule}
+                  >
+                    {savingSchedule ? "Saving…" : "Save schedule"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <CompanyPortalCard
+                driveId={drive.id}
+                companyAccess={drive.companyAccess}
+                defaultEmail={drive.company.contactEmail}
+                universityDomain={universityDomain}
+              />
+
+              {drive.status === "CLOSED" && (
+                <Card>
+                  <CardContent className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-bold">Results</div>
+                      {drive.resultsDeclared && (
+                        <Badge variant="outline">
+                          Declared{" "}
+                          {drive.resultsDeclaredAt
+                            ? new Date(drive.resultsDeclaredAt).toLocaleDateString()
+                            : ""}
+                        </Badge>
+                      )}
+                    </div>
+                    {!drive.resultsDeclared ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Not declared yet — students won&apos;t see who was selected until you
+                          declare results.
+                        </p>
+                        <Button
+                          size="sm"
+                          className="self-start"
+                          disabled={declaring}
+                          onClick={handleDeclareResults}
+                        >
+                          {declaring ? "Declaring…" : "Declare results"}
+                        </Button>
+                      </>
+                    ) : drive.results && drive.results.length > 0 ? (
+                      <ul className="list-inside list-disc text-sm">
+                        {drive.results.map((r, i) => (
+                          <li key={i}>
+                            {r.name}
+                            {r.studentId ? ` (${r.studentId})` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No students were selected.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <div>
                 <div className="mb-2 text-xs font-semibold text-muted-foreground">

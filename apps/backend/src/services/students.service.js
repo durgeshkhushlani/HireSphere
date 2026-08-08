@@ -67,9 +67,11 @@ async function getFullProfileForUniversity(userId, universityId) {
 }
 
 // Editable while the profile is unverified; once an admin verifies it, only
-// address/phone remain changeable (custom field values lock too).
-const EDITABLE_WHEN_UNVERIFIED = ['studentId', 'tenthPercentage', 'twelfthPercentage', 'bloodGroup', 'address', 'phone'];
-const EDITABLE_WHEN_VERIFIED = ['address', 'phone'];
+// address/phone remain changeable (custom field values lock too). resumeUrl
+// is the one exception that stays editable either way — a resume
+// legitimately changes over time and isn't part of academic verification.
+const EDITABLE_WHEN_UNVERIFIED = ['studentId', 'tenthPercentage', 'twelfthPercentage', 'bloodGroup', 'address', 'phone', 'resumeUrl'];
+const EDITABLE_WHEN_VERIFIED = ['address', 'phone', 'resumeUrl'];
 
 // All required — a student must fill in every one of these before an admin
 // can meaningfully verify the profile.

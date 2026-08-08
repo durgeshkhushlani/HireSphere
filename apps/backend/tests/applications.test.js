@@ -29,13 +29,27 @@ describe('applying to a drive', () => {
 
     const res = await applyTo(drive.id, student.token, {
       responses: { why: 'interested' },
-      resumeUrl: 'https://example.com/cv.pdf',
     });
 
     assert.equal(res.status, 201);
     assert.equal(res.body.status, 'APPLIED');
     assert.equal(res.body.driveId, drive.id);
     assert.deepEqual(res.body.responses, { why: 'interested' });
+    // resumeUrl is snapshotted from the profile, not client-supplied —
+    // seedScenario's default student has one on file.
+    assert.equal(res.body.resumeUrl, 'https://example.com/resume.pdf');
+  });
+
+  test('rejects applying with no resume on the profile', async () => {
+    const { drive } = await seedScenario();
+    const program = await createProgram();
+    const noResumeStudent = await registerStudent(drive.universityId, program.id, {
+      resumeUrl: null,
+    });
+
+    const res = await applyTo(drive.id, noResumeStudent.token, { responses: {} });
+
+    assert.equal(res.status, 400);
   });
 
   test('applying twice returns 409', async () => {
@@ -531,5 +545,197 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
     });
 
     assert.equal(res.status, 400);
+  });
+});
+
+describe('DELETE /api/applications/:id (withdraw)', () => {
+  test('a student can withdraw their own APPLIED application while the drive is OPEN', async () => {
+    const { student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await api()
+      .delete(`/api/applications/${created.body.id}`)
+      .set(...auth(student.token));
+
+    assert.equal(res.status, 204);
+    const gone = await api()
+      .get(`/api/applications/${created.body.id}`)
+      .set(...auth(student.token));
+    assert.equal(gone.status, 404);
+  });
+
+  test('withdrawing deletes the row, allowing a clean re-apply', async () => {
+    const { student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+    await api().delete(`/api/applications/${created.body.id}`).set(...auth(student.token));
+
+    const reapplied = await applyTo(drive.id, student.token);
+
+    assert.equal(reapplied.status, 201);
+  });
+
+  test('rejects withdrawing once status has moved past APPLIED', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+    await api()
+      .patch(`/api/applications/${created.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'SHORTLISTED' });
+
+    const res = await api()
+      .delete(`/api/applications/${created.body.id}`)
+      .set(...auth(student.token));
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects withdrawing once the drive has closed', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+    await api()
+      .patch(`/api/drives/${drive.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'CLOSED' });
+
+    const res = await api()
+      .delete(`/api/applications/${created.body.id}`)
+      .set(...auth(student.token));
+
+    assert.equal(res.status, 400);
+  });
+
+  test("cannot withdraw another student's application", async () => {
+    const { university, program, student, drive } = await seedScenario();
+    const other = await registerStudent(university.id, program.id);
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await api()
+      .delete(`/api/applications/${created.body.id}`)
+      .set(...auth(other.token));
+
+    assert.equal(res.status, 404);
+  });
+
+  test('is forbidden to admins', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await api()
+      .delete(`/api/applications/${created.body.id}`)
+      .set(...auth(admin.token));
+
+    assert.equal(res.status, 403);
+  });
+});
+
+describe('PATCH /api/applications/:id (student self-edit)', () => {
+  const editApplication = (id, token, body) =>
+    api()
+      .patch(`/api/applications/${id}`)
+      .set(...auth(token))
+      .send(body);
+
+  test('a student can update their responses while APPLIED and the drive is OPEN', async () => {
+    const { student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token, { responses: { why: 'first answer' } });
+
+    const res = await editApplication(created.body.id, student.token, {
+      responses: { why: 'updated answer' },
+    });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.responses, { why: 'updated answer' });
+  });
+
+  test('a student can re-rank role preferences', async () => {
+    const { student, drive } = await seedScenario();
+    const roleA = await createDriveRole(drive.id);
+    const roleB = await createDriveRole(drive.id);
+    const created = await applyTo(drive.id, student.token, {
+      responses: {},
+      rolePreferences: [roleA.id, roleB.id],
+    });
+
+    const res = await editApplication(created.body.id, student.token, {
+      rolePreferences: [roleB.id, roleA.id],
+    });
+
+    assert.equal(res.status, 200);
+    const refetched = await api()
+      .get(`/api/applications/${created.body.id}`)
+      .set(...auth(student.token));
+    assert.deepEqual(
+      refetched.body.rolePreferences.map((p) => p.driveRole.id),
+      [roleB.id, roleA.id]
+    );
+  });
+
+  test('rejects a rolePreference that does not belong to the drive', async () => {
+    const { student, drive } = await seedScenario();
+    const roleA = await createDriveRole(drive.id);
+    const created = await applyTo(drive.id, student.token, {
+      responses: {},
+      rolePreferences: [roleA.id],
+    });
+    const foreignRole = await createDriveRole((await createDrive(drive.universityId, drive.companyId)).id);
+
+    const res = await editApplication(created.body.id, student.token, {
+      rolePreferences: [foreignRole.id],
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects editing once status has moved past APPLIED', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+    await api()
+      .patch(`/api/applications/${created.body.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'SHORTLISTED' });
+
+    const res = await editApplication(created.body.id, student.token, {
+      responses: { why: 'too late' },
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects editing once the drive has closed', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+    await api()
+      .patch(`/api/drives/${drive.id}/status`)
+      .set(...auth(admin.token))
+      .send({ status: 'CLOSED' });
+
+    const res = await editApplication(created.body.id, student.token, {
+      responses: { why: 'too late' },
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test("cannot edit another student's application", async () => {
+    const { university, program, student, drive } = await seedScenario();
+    const other = await registerStudent(university.id, program.id);
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await editApplication(created.body.id, other.token, {
+      responses: { why: 'hijacked' },
+    });
+
+    assert.equal(res.status, 404);
+  });
+
+  test('is forbidden to admins', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const created = await applyTo(drive.id, student.token);
+
+    const res = await editApplication(created.body.id, admin.token, {
+      responses: { why: 'nope' },
+    });
+
+    assert.equal(res.status, 403);
   });
 });

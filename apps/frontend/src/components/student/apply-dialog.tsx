@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +13,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
@@ -23,7 +23,7 @@ import {
   type ApplicationFormQuestion,
   type Drive,
 } from "@/lib/api/drives";
-import { normalizeUrl } from "@/lib/url";
+import { getMyProfile } from "@/lib/api/students";
 
 export function ApplyDialog({
   drive,
@@ -39,7 +39,7 @@ export function ApplyDialog({
   const [loadingForm, setLoadingForm] = useState(false);
   const [questions, setQuestions] = useState<ApplicationFormQuestion[]>([]);
   const [responses, setResponses] = useState<Record<string, string>>({});
-  const [resumeUrl, setResumeUrl] = useState("");
+  const [resumeOnFile, setResumeOnFile] = useState<string | null>(null);
   const [rolePreferences, setRolePreferences] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,21 +47,23 @@ export function ApplyDialog({
     setOpen(nextOpen);
     if (!nextOpen) {
       setResponses({});
-      setResumeUrl("");
       setRolePreferences([]);
       return;
     }
     if (!token) return;
     setLoadingForm(true);
     try {
-      const form = await getApplicationForm(drive.id, token);
+      const [form, profile] = await Promise.all([
+        getApplicationForm(drive.id, token).catch((err) => {
+          if (err instanceof ApiError && err.status === 404) return { questions: [] };
+          throw err;
+        }),
+        getMyProfile(token),
+      ]);
       setQuestions(form.questions);
+      setResumeOnFile(profile.resumeUrl);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        setQuestions([]);
-      } else {
-        toast.error(err instanceof ApiError ? err.message : "Couldn't load the application form");
-      }
+      toast.error(err instanceof ApiError ? err.message : "Couldn't load the application form");
     } finally {
       setLoadingForm(false);
     }
@@ -75,6 +77,10 @@ export function ApplyDialog({
 
   async function handleSubmit() {
     if (!token) return;
+    if (!resumeOnFile) {
+      toast.error("Upload a resume to your profile before applying");
+      return;
+    }
     if (drive.roles.length > 0 && rolePreferences.length === 0) {
       toast.error("Pick at least one role, in order of preference");
       return;
@@ -90,7 +96,6 @@ export function ApplyDialog({
         drive.id,
         {
           responses,
-          resumeUrl: resumeUrl ? normalizeUrl(resumeUrl) : undefined,
           rolePreferences: drive.roles.length > 0 ? rolePreferences : undefined,
         },
         token
@@ -98,7 +103,6 @@ export function ApplyDialog({
       toast.success(`Applied to ${drive.title} at ${drive.company.name}`);
       setOpen(false);
       setResponses({});
-      setResumeUrl("");
       setRolePreferences([]);
       onApplied();
     } catch (err) {
@@ -165,21 +169,22 @@ export function ApplyDialog({
                 />
               </div>
             ))}
-            <div>
-              <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                Resume link (optional)
-              </Label>
-              <Input
-                value={resumeUrl}
-                onChange={(e) => setResumeUrl(e.target.value)}
-                placeholder="https://drive.google.com/…"
-              />
-            </div>
+            {resumeOnFile ? (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <FileText className="size-3.5 shrink-0" />
+                Your resume on file will be submitted automatically with this application.
+              </p>
+            ) : (
+              <p className="text-xs text-destructive">
+                You don&apos;t have a resume on file yet — upload one from your profile (top
+                right) before applying.
+              </p>
+            )}
           </div>
         )}
 
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={submitting || loadingForm}>
+          <Button onClick={handleSubmit} disabled={submitting || loadingForm || !resumeOnFile}>
             {submitting ? "Submitting…" : "Submit application"}
           </Button>
         </DialogFooter>

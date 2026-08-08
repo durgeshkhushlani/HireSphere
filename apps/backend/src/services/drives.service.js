@@ -1,5 +1,8 @@
 const prisma = require('../lib/prisma');
 const ApiError = require('../lib/ApiError');
+const notificationsService = require('./notifications.service');
+const companyPortalService = require('./company-portal.service');
+const mailer = require('../lib/mailer');
 
 const DRIVE_STATUSES = ['DRAFT', 'OPEN', 'CLOSED'];
 
@@ -13,12 +16,29 @@ async function requireScoped(driveId, universityId) {
 
 const ROLES_ORDER = { orderBy: { createdAt: 'asc' } };
 
-function listForUniversity(universityId) {
-  return prisma.drive.findMany({
+async function listForUniversity(universityId) {
+  const drives = await prisma.drive.findMany({
     where: { universityId },
     include: { company: true, roles: ROLES_ORDER },
     orderBy: { createdAt: 'desc' },
   });
+  return Promise.all(
+    drives.map(async (d) => (d.resultsDeclared ? { ...d, results: await getResults(d.id) } : d))
+  );
+}
+
+// Only meaningful once resultsDeclared — the selected-student list, scoped
+// to just name + studentId (never CGPA, email, or anything else), since
+// this is shown to every student at the university, not just applicants.
+async function getResults(driveId) {
+  const selected = await prisma.application.findMany({
+    where: { driveId, status: 'SELECTED' },
+    include: { studentProfile: { include: { user: { select: { name: true } } } } },
+  });
+  return selected.map((a) => ({
+    name: a.studentProfile.user.name,
+    studentId: a.studentProfile.studentId,
+  }));
 }
 
 async function getForUniversity(driveId, universityId) {
@@ -27,7 +47,8 @@ async function getForUniversity(driveId, universityId) {
     include: { company: true, eligiblePrograms: true, roles: ROLES_ORDER },
   });
   if (!drive) throw ApiError.notFound('Drive not found');
-  return drive;
+  if (!drive.resultsDeclared) return drive;
+  return { ...drive, results: await getResults(drive.id) };
 }
 
 async function create({ companyId, title, description, minCgpa, maxBacklogs }, universityId) {
@@ -38,8 +59,9 @@ async function create({ companyId, title, description, minCgpa, maxBacklogs }, u
     throw ApiError.badRequest('maxBacklogs cannot be negative');
   }
 
+  let drive;
   try {
-    return await prisma.drive.create({
+    drive = await prisma.drive.create({
       data: {
         companyId,
         title,
@@ -48,11 +70,53 @@ async function create({ companyId, title, description, minCgpa, maxBacklogs }, u
         ...(minCgpa !== undefined && { minCgpa }),
         ...(maxBacklogs !== undefined && { maxBacklogs }),
       },
+      include: { company: true, university: true },
     });
   } catch (err) {
     if (err.code === 'P2003') throw ApiError.badRequest('companyId does not exist');
     throw err;
   }
+
+  try {
+    await notificationsService.notify(universityId, 'NEW_DRIVE', {
+      subject: `New drive opened: ${drive.title}`,
+      text: [
+        `A new drive was created on HireSphere.`,
+        '',
+        `Title: ${drive.title}`,
+        `Company: ${drive.company.name}`,
+        `Status: ${drive.status}`,
+      ].join('\n'),
+    });
+  } catch (err) {
+    console.error('Failed to send new-drive notification:', err);
+  }
+
+  // Every drive gets its own company-portal login, generated up front —
+  // the one-time plaintext password is only ever available on this
+  // response (and the regenerate-password response later).
+  const { accessCode, password } = await companyPortalService.createAccess(drive.id);
+
+  if (drive.company.contactEmail) {
+    try {
+      await mailer.sendMail({
+        to: drive.company.contactEmail,
+        subject: `HireSphere company portal access — ${drive.title}`,
+        text: [
+          `You've been given access to review applicants for "${drive.title}" on HireSphere.`,
+          '',
+          `Portal link: ${companyPortalService.portalUrl(drive.university.domain, accessCode)}`,
+          `Password: ${password}`,
+          '',
+          'This link only shows applicants for this specific drive.',
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error('Failed to send company-portal welcome email:', err);
+    }
+  }
+
+  return { ...drive, companyAccess: { accessCode, password } };
 }
 
 // title/description/minCgpa/maxBacklogs were previously only settable at
@@ -86,7 +150,51 @@ async function updateStatus(driveId, universityId, status) {
 
   await requireScoped(driveId, universityId);
 
-  return prisma.drive.update({ where: { id: driveId }, data: { status } });
+  return prisma.drive.update({
+    where: { id: driveId },
+    // Stamped every time it's (re-)opened — shown to students as the
+    // drive's "start" date. There's no separate scheduled auto-open, only
+    // auto-close (setAutoClose below).
+    data: { status, ...(status === 'OPEN' && { openedAt: new Date() }) },
+  });
+}
+
+// Opt-in scheduled close, toggled independently of the status itself —
+// autoCloseAt: null disables it. autoCloseDispatcher.js's poller flips the
+// drive to CLOSED once it passes.
+async function setAutoClose(driveId, universityId, autoCloseAt) {
+  await requireScoped(driveId, universityId);
+
+  if (autoCloseAt !== null) {
+    if (!autoCloseAt || Number.isNaN(new Date(autoCloseAt).getTime())) {
+      throw ApiError.badRequest('autoCloseAt must be a valid date, or null to disable');
+    }
+    if (new Date(autoCloseAt).getTime() <= Date.now()) {
+      throw ApiError.badRequest('autoCloseAt must be in the future');
+    }
+  }
+
+  return prisma.drive.update({
+    where: { id: driveId },
+    data: { autoCloseAt: autoCloseAt === null ? null : new Date(autoCloseAt) },
+  });
+}
+
+// A deliberate, separate step from closing — an admin can close a drive and
+// still choose not to reveal who got selected until later.
+async function declareResults(driveId, universityId) {
+  const drive = await requireScoped(driveId, universityId);
+  if (drive.status !== 'CLOSED') {
+    throw ApiError.badRequest('Results can only be declared once the drive is closed');
+  }
+  if (drive.resultsDeclared) {
+    throw ApiError.conflict('Results have already been declared for this drive');
+  }
+
+  return prisma.drive.update({
+    where: { id: driveId },
+    data: { resultsDeclared: true, resultsDeclaredAt: new Date() },
+  });
 }
 
 async function getApplicationForm(driveId, universityId) {
@@ -261,6 +369,8 @@ module.exports = {
   create,
   updateDetails,
   updateStatus,
+  setAutoClose,
+  declareResults,
   getApplicationForm,
   getApplicationFormOrEmpty,
   setApplicationForm,

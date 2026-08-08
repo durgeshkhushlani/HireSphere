@@ -1,6 +1,7 @@
 const prisma = require('../lib/prisma');
 const ApiError = require('../lib/ApiError');
 const drivesService = require('./drives.service');
+const notificationsService = require('./notifications.service');
 
 const APPLICATION_STATUSES = [
   'APPLIED',
@@ -36,7 +37,9 @@ const APPLICANT_INCLUDE = {
 };
 
 // Plan §4: eligibility is checked automatically against the student's stored
-// profile. A null criterion on the drive means "no restriction on that dimension".
+// profile. A null criterion on the drive means "no restriction on that
+// dimension". Returns the profile so callers (applyToDrive) don't need a
+// second fetch just to read resumeUrl.
 async function assertEligible(drive, studentProfileId) {
   const profile = await prisma.studentProfile.findUnique({
     where: { userId: studentProfileId },
@@ -48,6 +51,10 @@ async function assertEligible(drive, studentProfileId) {
   // Global placement lock: once selected anywhere, no further applications.
   if (profile.placementLocked) {
     throw ApiError.forbidden('You are already placed and cannot apply to further drives');
+  }
+
+  if (!profile.resumeUrl) {
+    throw ApiError.badRequest('Upload a resume to your profile before applying');
   }
 
   if (drive.minCgpa != null && Number(profile.cgpa) < Number(drive.minCgpa)) {
@@ -69,32 +76,16 @@ async function assertEligible(drive, studentProfileId) {
       throw ApiError.forbidden('Your program is not eligible for this drive');
     }
   }
+
+  return profile;
 }
 
-async function applyToDrive({
-  driveId,
-  universityId,
-  studentProfileId,
-  responses,
-  resumeUrl,
-  rolePreferences,
-}) {
-  if (responses === undefined) {
-    throw ApiError.badRequest('responses is required');
-  }
-
-  const drive = await drivesService.requireScoped(driveId, universityId);
-  if (drive.status !== 'OPEN') {
-    throw ApiError.badRequest('This drive is not currently open for applications');
-  }
-
-  await assertEligible(drive, studentProfileId);
-
-  // Required only when the drive actually has roles defined — legacy drives
-  // with none skip this. But if rolePreferences is provided at all, it's
-  // always validated against this drive's actual roles (so a 0-role drive
-  // still rejects a stray id from some other drive, rather than silently
-  // ignoring it).
+// Shared by applyToDrive and updateMyApplication — required whenever the
+// drive actually has roles defined (legacy drives with none skip this). If
+// rolePreferences is provided at all, it's always validated against this
+// drive's actual roles, so a stray id from some other drive is rejected
+// rather than silently ignored.
+async function validateRolePreferences(drive, rolePreferences) {
   const roles = await prisma.driveRole.findMany({ where: { driveId: drive.id } });
   if (roles.length > 0 && (!Array.isArray(rolePreferences) || rolePreferences.length === 0)) {
     throw ApiError.badRequest('rolePreferences is required for this drive');
@@ -111,11 +102,29 @@ async function applyToDrive({
       throw ApiError.badRequest('One or more rolePreferences do not belong to this drive');
     }
   }
+}
+
+// resumeUrl is never client-supplied — it's a snapshot of whatever's on the
+// student's profile at the moment they apply, taken automatically so a
+// later profile update doesn't retroactively change what a company already
+// received for a past application.
+async function applyToDrive({ driveId, universityId, studentProfileId, responses, rolePreferences }) {
+  if (responses === undefined) {
+    throw ApiError.badRequest('responses is required');
+  }
+
+  const drive = await drivesService.requireScoped(driveId, universityId);
+  if (drive.status !== 'OPEN') {
+    throw ApiError.badRequest('This drive is not currently open for applications');
+  }
+
+  const profile = await assertEligible(drive, studentProfileId);
+  await validateRolePreferences(drive, rolePreferences);
 
   try {
     return await prisma.$transaction(async (tx) => {
       const application = await tx.application.create({
-        data: { driveId: drive.id, studentProfileId, responses, resumeUrl },
+        data: { driveId: drive.id, studentProfileId, responses, resumeUrl: profile.resumeUrl },
       });
       if (Array.isArray(rolePreferences) && rolePreferences.length > 0) {
         await tx.applicationRolePreference.createMany({
@@ -188,10 +197,72 @@ async function getForUser(id, user) {
   return application;
 }
 
+// The one gate shared by withdraw and self-edit: a student may only change
+// their mind while the drive is still accepting applications (OPEN, or
+// auto-closed out from under it — same check either way) and before an
+// admin has moved them past the initial APPLIED stage.
+async function requireEditableByStudent(applicationId, studentProfileId) {
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: { drive: true },
+  });
+  if (!application || application.studentProfileId !== studentProfileId) {
+    throw ApiError.notFound('Application not found');
+  }
+  if (application.status !== 'APPLIED' || application.drive.status !== 'OPEN') {
+    throw ApiError.badRequest(
+      'This application can no longer be withdrawn or edited — the drive has closed or your status has changed'
+    );
+  }
+  return application;
+}
+
+// Deletes the row entirely rather than a WITHDRAWN status — the student can
+// cleanly re-apply later while the drive is still open, same as if they'd
+// never applied.
+async function withdraw(applicationId, studentProfileId) {
+  const application = await requireEditableByStudent(applicationId, studentProfileId);
+  await prisma.application.delete({ where: { id: application.id } });
+}
+
+// responses/rolePreferences are each independently optional — a student
+// might only be changing their question answers, or only re-ranking roles.
+async function updateMyApplication(applicationId, studentProfileId, { responses, rolePreferences }) {
+  const application = await requireEditableByStudent(applicationId, studentProfileId);
+
+  if (rolePreferences !== undefined) {
+    await validateRolePreferences(application.drive, rolePreferences);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.application.update({
+      where: { id: application.id },
+      data: { ...(responses !== undefined && { responses }) },
+    });
+    if (rolePreferences !== undefined) {
+      await tx.applicationRolePreference.deleteMany({ where: { applicationId: application.id } });
+      if (rolePreferences.length > 0) {
+        await tx.applicationRolePreference.createMany({
+          data: rolePreferences.map((driveRoleId, index) => ({
+            applicationId: application.id,
+            driveRoleId,
+            rank: index + 1,
+          })),
+        });
+      }
+    }
+    return updated;
+  });
+}
+
+// callerDriveId is only set for a COMPANY-role caller (from their JWT) —
+// scopes them to just their own drive's applications, on top of the usual
+// university scoping every caller gets.
 async function updateStatus(
   id,
   universityId,
-  { status, interviewSlot, interviewVenue, packageAmount, selectedRoleId }
+  { status, interviewSlot, interviewVenue, packageAmount, selectedRoleId },
+  callerDriveId
 ) {
   if (!APPLICATION_STATUSES.includes(status)) {
     throw ApiError.badRequest(`status must be one of: ${APPLICATION_STATUSES.join(', ')}`);
@@ -199,9 +270,16 @@ async function updateStatus(
 
   const application = await prisma.application.findUnique({
     where: { id },
-    include: { drive: true, rolePreferences: true },
+    include: {
+      drive: { include: { company: true } },
+      rolePreferences: true,
+      studentProfile: { include: { user: { select: { name: true } } } },
+    },
   });
   if (!application || application.drive.universityId !== universityId) {
+    throw ApiError.notFound('Application not found');
+  }
+  if (callerDriveId !== undefined && application.driveId !== callerDriveId) {
     throw ApiError.notFound('Application not found');
   }
 
@@ -234,7 +312,7 @@ async function updateStatus(
   // Status change, placement record and placement lock must move together —
   // a partial write here would either lock a student with no placement on
   // record, or record a placement without locking them.
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.application.update({
       where: { id },
       data: {
@@ -282,6 +360,25 @@ async function updateStatus(
 
     return updated;
   });
+
+  if (nowSelected && !wasSelected) {
+    try {
+      await notificationsService.notify(universityId, 'STUDENT_SELECTED', {
+        subject: `Student selected: ${application.studentProfile.user.name}`,
+        text: [
+          `A student was marked Selected on HireSphere.`,
+          '',
+          `Student: ${application.studentProfile.user.name}`,
+          `Drive: ${application.drive.title}`,
+          `Company: ${application.drive.company.name}`,
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error('Failed to send student-selected notification:', err);
+    }
+  }
+
+  return result;
 }
 
 // Plan §4: "a global apply toggle lets admin apply the same slot/venue setup
@@ -395,6 +492,8 @@ module.exports = {
   listForDriveByStatus,
   listForStudent,
   getForUser,
+  withdraw,
+  updateMyApplication,
   updateStatus,
   bulkSetInterviewSchedule,
   scheduleResumeDelivery,
