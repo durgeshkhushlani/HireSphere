@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +35,10 @@ export function DriveManager() {
   const { token } = useAuth();
   const [drives, setDrives] = useState<Drive[] | null>(null);
   const [query, setQuery] = useState("");
+  const [pendingChange, setPendingChange] = useState<{ drive: Drive; status: DriveStatus } | null>(
+    null
+  );
+  const [confirming, setConfirming] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -41,14 +53,19 @@ export function DriveManager() {
     refresh();
   }, [refresh]);
 
-  async function handleStatusChange(drive: Drive, status: DriveStatus) {
-    if (!token || status === drive.status) return;
+  async function handleConfirmStatusChange() {
+    if (!token || !pendingChange) return;
+    const { drive, status } = pendingChange;
+    setConfirming(true);
     try {
       await updateDriveStatus(drive.id, status, token);
       toast.success(`${drive.title} is now ${status.toLowerCase()}`);
+      setPendingChange(null);
       refresh();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't update status");
+    } finally {
+      setConfirming(false);
     }
   }
 
@@ -117,7 +134,9 @@ export function DriveManager() {
                     <Select
                       value={drive.status}
                       onValueChange={(value) =>
-                        value && handleStatusChange(drive, value as DriveStatus)
+                        value &&
+                        value !== drive.status &&
+                        setPendingChange({ drive, status: value as DriveStatus })
                       }
                     >
                       <SelectTrigger size="sm" className="flex-1 text-xs">
@@ -146,6 +165,31 @@ export function DriveManager() {
           })}
         </div>
       )}
+
+      <Dialog open={pendingChange !== null} onOpenChange={(open) => !open && setPendingChange(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change drive status?</DialogTitle>
+            <DialogDescription>
+              {pendingChange && (
+                <>
+                  {pendingChange.drive.title} will move from{" "}
+                  <strong>{pendingChange.drive.status}</strong> to{" "}
+                  <strong>{pendingChange.status}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingChange(null)} disabled={confirming}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmStatusChange} disabled={confirming}>
+              {confirming ? "Updating…" : "Confirm change"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
