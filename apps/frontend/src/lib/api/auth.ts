@@ -13,6 +13,7 @@ export type MyProfile = AuthUser & {
     contactEmail: string | null;
     contactPhone: string | null;
     timezone: string;
+    placementLockEnabled: boolean;
   };
 };
 

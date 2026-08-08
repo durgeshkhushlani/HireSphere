@@ -43,13 +43,17 @@ export function createProgram(name: string) {
 }
 
 export function updateMyUniversity(
-  input: { contactEmail?: string; contactPhone?: string; timezone?: string },
+  input: {
+    contactEmail?: string;
+    contactPhone?: string;
+    timezone?: string;
+    placementLockEnabled?: boolean;
+  },
   token: string
 ) {
-  return apiFetch<University & { contactPhone: string | null; timezone: string }>(
-    "/universities/me",
-    { method: "PATCH", body: input, token }
-  );
+  return apiFetch<
+    University & { contactPhone: string | null; timezone: string; placementLockEnabled: boolean }
+  >("/universities/me", { method: "PATCH", body: input, token });
 }
 
 export function linkUniversityProgram(programId: string, token: string) {

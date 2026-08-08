@@ -26,5 +26,6 @@ router.get('/', requireRole('ADMIN'), studentsController.list);
 // otherwise swallow those exact-path routes first.
 router.get('/:userId', requireRole('ADMIN'), studentsController.getById);
 router.patch('/:userId/verify', requireRole('ADMIN'), studentsController.setVerified);
+router.patch('/:userId/placement-lock', requireRole('ADMIN'), studentsController.setPlacementLock);
 
 module.exports = router;

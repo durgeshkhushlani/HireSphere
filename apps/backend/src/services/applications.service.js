@@ -168,6 +168,37 @@ async function listForDriveByStatus(driveId, universityId, statuses) {
   });
 }
 
+// Chat-assistant lookup only — backs the admin-only find_applicants tool.
+// Scoped by universityId via the drive relation, never a client-supplied id.
+async function searchForUniversity(universityId, { query, applicationId, driveQuery } = {}) {
+  return prisma.application.findMany({
+    where: {
+      drive: {
+        universityId,
+        ...(driveQuery && {
+          OR: [
+            { title: { contains: driveQuery, mode: 'insensitive' } },
+            { company: { name: { contains: driveQuery, mode: 'insensitive' } } },
+          ],
+        }),
+      },
+      ...(applicationId && { id: applicationId }),
+      ...(query && {
+        studentProfile: {
+          user: {
+            OR: [
+              { name: { contains: query, mode: 'insensitive' } },
+              { email: { contains: query, mode: 'insensitive' } },
+            ],
+          },
+        },
+      }),
+    },
+    include: { ...APPLICANT_INCLUDE, drive: { include: { company: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 function listForStudent(studentProfileId) {
   return prisma.application.findMany({
     where: { studentProfileId },
@@ -219,10 +250,16 @@ async function requireEditableByStudent(applicationId, studentProfileId) {
 
 // Deletes the row entirely rather than a WITHDRAWN status — the student can
 // cleanly re-apply later while the drive is still open, same as if they'd
-// never applied.
+// never applied. Role preferences have no cascade delete at the schema
+// level (children-before-parents is explicit everywhere in this codebase,
+// see demo.service.js's cleanup), so they're removed first or the
+// application delete fails on the foreign key.
 async function withdraw(applicationId, studentProfileId) {
   const application = await requireEditableByStudent(applicationId, studentProfileId);
-  await prisma.application.delete({ where: { id: application.id } });
+  await prisma.$transaction([
+    prisma.applicationRolePreference.deleteMany({ where: { applicationId: application.id } }),
+    prisma.application.delete({ where: { id: application.id } }),
+  ]);
 }
 
 // responses/rolePreferences are each independently optional — a student
@@ -309,9 +346,13 @@ async function updateStatus(
     resolvedRole = await prisma.driveRole.findUnique({ where: { id: selectedRoleId } });
   }
 
-  // Status change, placement record and placement lock must move together —
-  // a partial write here would either lock a student with no placement on
-  // record, or record a placement without locking them.
+  // Status change and placement record move together — a partial write here
+  // would record a placement with no matching status, or vice versa. The
+  // placement *lock* is deliberately not touched here — see
+  // students.service.js's setPlacementLock: whether a placed student is
+  // locked out of further applications is now an explicit, separate admin
+  // decision (and only usable at all if the university has enabled it), not
+  // an automatic side effect of a status change.
   const result = await prisma.$transaction(async (tx) => {
     const updated = await tx.application.update({
       where: { id },
@@ -342,19 +383,12 @@ async function updateStatus(
           ...(packageAmountToSet != null && { packageAmount: packageAmountToSet }),
         },
       });
-      await tx.studentProfile.update({
-        where: { userId: application.studentProfileId },
-        data: { placementLocked: true },
-      });
     } else if (wasSelected && !nowSelected) {
-      // Admin undoing a selection. Without this the student would stay
-      // permanently locked out of every future drive.
+      // Admin undoing a selection — remove the placement record it created.
+      // The placement lock (if the admin had separately set one) is left
+      // alone; unlocking is now that same explicit admin decision too.
       await tx.placement.deleteMany({
         where: { driveId: application.driveId, userId: application.studentProfileId },
-      });
-      await tx.studentProfile.update({
-        where: { userId: application.studentProfileId },
-        data: { placementLocked: false },
       });
     }
 
@@ -490,6 +524,7 @@ module.exports = {
   applyToDrive,
   listForDrive,
   listForDriveByStatus,
+  searchForUniversity,
   listForStudent,
   getForUser,
   withdraw,

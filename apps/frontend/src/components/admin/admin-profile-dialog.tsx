@@ -54,12 +54,14 @@ export function AdminProfileDialog({
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [placementLockEnabled, setPlacementLockEnabled] = useState(true);
 
   function syncForm(p: MyProfile) {
     setProfile(p);
     setContactEmail(p.university.contactEmail ?? "");
     setContactPhone(p.university.contactPhone ?? "");
     setTimezone(p.university.timezone);
+    setPlacementLockEnabled(p.university.placementLockEnabled);
   }
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export function AdminProfileDialog({
     if (!token) return;
     setSaving(true);
     try {
-      await updateMyUniversity({ contactEmail, contactPhone, timezone }, token);
+      await updateMyUniversity({ contactEmail, contactPhone, timezone, placementLockEnabled }, token);
       const refreshed = await getMe(token);
       syncForm(refreshed);
       setEditing(false);
@@ -153,12 +155,32 @@ export function AdminProfileDialog({
                         your university.
                       </p>
                     </div>
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold">
+                        <input
+                          type="checkbox"
+                          checked={placementLockEnabled}
+                          onChange={(e) => setPlacementLockEnabled(e.target.checked)}
+                          className="size-4 rounded border-input"
+                        />
+                        Placement lock
+                      </label>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Enabling this lets you lock any placed student from sitting in further
+                        drives, from the Placements tab. Leave this off if your university allows
+                        placed students to keep applying for a better offer.
+                      </p>
+                    </div>
                   </>
                 ) : (
                   <>
                     <Field label="Contact email" value={profile.university.contactEmail} />
                     <Field label="Contact phone" value={profile.university.contactPhone} />
                     <Field label="Time zone" value={profile.university.timezone} />
+                    <Field
+                      label="Placement lock"
+                      value={profile.university.placementLockEnabled ? "Enabled" : "Disabled"}
+                    />
                   </>
                 )}
               </div>

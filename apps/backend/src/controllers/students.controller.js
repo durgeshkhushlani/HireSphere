@@ -31,6 +31,15 @@ async function setVerified(req, res) {
   res.json(profile);
 }
 
+async function setPlacementLock(req, res) {
+  const profile = await studentsService.setPlacementLock(
+    req.params.userId,
+    req.user.universityId,
+    req.body.locked
+  );
+  res.json(profile);
+}
+
 async function listFieldDefinitions(req, res) {
   res.json(await studentFieldsService.listForUniversity(req.user.universityId));
 }
@@ -52,6 +61,7 @@ module.exports = {
   list,
   getById,
   setVerified,
+  setPlacementLock,
   listFieldDefinitions,
   createFieldDefinition,
   deleteFieldDefinition,

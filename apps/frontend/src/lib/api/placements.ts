@@ -16,7 +16,7 @@ export type Placement = {
     contactPhone: string | null;
   };
   drive: { id: string; title: string } | null;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; placementLocked: boolean };
 };
 
 export function listPlacements(token: string) {

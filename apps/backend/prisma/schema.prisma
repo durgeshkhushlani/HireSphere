@@ -72,6 +72,15 @@ model University {
   // physical location regardless of who's looking at the schedule.
   timezone     String  @default("Asia/Kolkata")
 
+  // Gates the manual "lock a placed student" action (see
+  // students.service.js's setPlacementLock) — a student's placementLocked
+  // flag is never set automatically on selection, only by an admin
+  // explicitly choosing to lock them. Some universities let a placed
+  // student keep applying elsewhere for a better offer, so this defaults to
+  // on (matching the platform's historical always-lock behavior) but can be
+  // turned off per university.
+  placementLockEnabled Boolean @default(true) @map("placement_lock_enabled")
+
   // "Try it out" demo mode: an isolated, throwaway tenant reusing the same
   // university_id scoping every other query already uses — no separate
   // isDemo/expiresAt columns needed anywhere else. demoExpiresAt is null for

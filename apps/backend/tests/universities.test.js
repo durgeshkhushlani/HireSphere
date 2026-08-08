@@ -148,6 +148,34 @@ describe('PATCH /api/universities/me', () => {
     assert.equal(res.body.timezone, 'Asia/Kolkata');
   });
 
+  test('defaults placementLockEnabled to true, and lets an admin turn it off', async () => {
+    const university = await createUniversity();
+    const admin = await registerAdmin(university.id);
+
+    const initial = await api().get('/api/auth/me').set(...auth(admin.token));
+    assert.equal(initial.body.university.placementLockEnabled, true);
+
+    const res = await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({ placementLockEnabled: false });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.placementLockEnabled, false);
+  });
+
+  test('rejects a non-boolean placementLockEnabled', async () => {
+    const university = await createUniversity();
+    const admin = await registerAdmin(university.id);
+
+    const res = await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({ placementLockEnabled: 'nope' });
+
+    assert.equal(res.status, 400);
+  });
+
   test('rejects a contact email on a different domain', async () => {
     const university = await createUniversity();
     const admin = await registerAdmin(university.id);

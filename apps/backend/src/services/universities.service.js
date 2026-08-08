@@ -76,12 +76,16 @@ function isValidTimeZone(tz) {
   }
 }
 
-// Admin self-service: only these 3 fields, since nothing else about a
+// Admin self-service: only these fields, since nothing else about a
 // university (name, domain, verified status) should be editable by its own
 // admin. contactPhone has no format validation (international numbers vary
 // too much to police usefully); contactEmail keeps the same domain-match
-// rule as registration.
-async function updateMine(universityId, { contactEmail, contactPhone, timezone }) {
+// rule as registration. placementLockEnabled gates whether the admin can use
+// the manual per-student placement lock at all (see students.service.js's
+// setPlacementLock) — off by default has no meaning here since it defaults
+// to true; this just lets a university that allows placed students to keep
+// applying elsewhere turn the whole mechanism off.
+async function updateMine(universityId, { contactEmail, contactPhone, timezone, placementLockEnabled }) {
   const university = await prisma.university.findUnique({ where: { id: universityId } });
   if (!university) throw ApiError.notFound('University not found');
 
@@ -94,6 +98,9 @@ async function updateMine(universityId, { contactEmail, contactPhone, timezone }
   if (timezone !== undefined && !isValidTimeZone(timezone)) {
     throw ApiError.badRequest('timezone must be a valid IANA time zone id, e.g. "Asia/Kolkata"');
   }
+  if (placementLockEnabled !== undefined && typeof placementLockEnabled !== 'boolean') {
+    throw ApiError.badRequest('placementLockEnabled must be a boolean');
+  }
 
   return prisma.university.update({
     where: { id: universityId },
@@ -101,6 +108,7 @@ async function updateMine(universityId, { contactEmail, contactPhone, timezone }
       ...(contactEmail !== undefined && { contactEmail }),
       ...(contactPhone !== undefined && { contactPhone }),
       ...(timezone !== undefined && { timezone }),
+      ...(placementLockEnabled !== undefined && { placementLockEnabled }),
     },
   });
 }

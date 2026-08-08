@@ -28,6 +28,12 @@ const setStatus = (applicationId, token, body) =>
     .set(...auth(token))
     .send(body);
 
+const setLock = (userId, token, locked) =>
+  api()
+    .patch(`/api/students/${userId}/placement-lock`)
+    .set(...auth(token))
+    .send({ locked });
+
 describe('eligibility — minimum CGPA', () => {
   test('blocks a student below the threshold', async () => {
     const { student, drive } = await seedScenario({
@@ -99,7 +105,7 @@ describe('eligibility — backlog limit', () => {
   });
 });
 
-describe('selection creates a placement and locks the student', () => {
+describe('selection creates a placement; the lock is admin-governed, not automatic', () => {
   test('marking SELECTED records a placement', async () => {
     const { admin, student, drive, company } = await seedScenario();
     const application = await applyTo(drive.id, student.token);
@@ -119,7 +125,7 @@ describe('selection creates a placement and locks the student', () => {
     assert.equal(Number(placements[0].packageAmount), 1800000);
   });
 
-  test('marking SELECTED sets the global placement lock', async () => {
+  test('marking SELECTED does not lock the student automatically', async () => {
     const { admin, student, drive } = await seedScenario();
     const application = await applyTo(drive.id, student.token);
 
@@ -128,13 +134,27 @@ describe('selection creates a placement and locks the student', () => {
     const profile = await prisma.studentProfile.findUnique({
       where: { userId: student.user.id },
     });
-    assert.equal(profile.placementLocked, true);
+    assert.equal(profile.placementLocked, false);
   });
 
-  test('a placed student cannot apply to any other drive', async () => {
+  test('a placed student can still apply elsewhere until an admin locks them', async () => {
     const { admin, student, drive, university } = await seedScenario();
     const application = await applyTo(drive.id, student.token);
     await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
+
+    const secondCompany = await createCompany();
+    const secondDrive = await createDrive(university.id, secondCompany.id, { status: 'OPEN' });
+
+    const res = await applyTo(secondDrive.id, student.token);
+
+    assert.equal(res.status, 201);
+  });
+
+  test('once an admin locks a placed student, they cannot apply to any other drive', async () => {
+    const { admin, student, drive, university } = await seedScenario();
+    const application = await applyTo(drive.id, student.token);
+    await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
+    await setLock(student.user.id, admin.token, true);
 
     const secondCompany = await createCompany();
     const secondDrive = await createDrive(university.id, secondCompany.id, { status: 'OPEN' });
@@ -145,13 +165,14 @@ describe('selection creates a placement and locks the student', () => {
     assert.match(res.body.error, /already placed/i);
   });
 
-  test('does not lock other students', async () => {
+  test('locking one student does not lock others', async () => {
     const { admin, student, drive, university, program } = await seedScenario();
     const { registerStudent } = require('./helpers/factories');
     const peer = await registerStudent(university.id, program.id);
 
     const application = await applyTo(drive.id, student.token);
     await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
+    await setLock(student.user.id, admin.token, true);
 
     const peerProfile = await prisma.studentProfile.findUnique({
       where: { userId: peer.user.id },
@@ -275,19 +296,13 @@ describe('selecting with roles', () => {
 });
 
 describe('reversing a selection', () => {
-  test('releases the lock and removes the placement', async () => {
+  test('removes the placement', async () => {
     const { admin, student, drive } = await seedScenario();
     const application = await applyTo(drive.id, student.token);
     await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
 
-    // An admin correcting a misclick must not leave the student locked out
-    // of every future drive.
     await setStatus(application.body.id, admin.token, { status: 'SHORTLISTED' });
 
-    const profile = await prisma.studentProfile.findUnique({
-      where: { userId: student.user.id },
-    });
-    assert.equal(profile.placementLocked, false);
     assert.equal(await prisma.placement.count(), 0);
   });
 
@@ -303,6 +318,23 @@ describe('reversing a selection', () => {
     const res = await applyTo(secondDrive.id, student.token);
 
     assert.equal(res.status, 201);
+  });
+
+  test('does not auto-unlock a student an admin had manually locked', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const application = await applyTo(drive.id, student.token);
+    await setStatus(application.body.id, admin.token, { status: 'SELECTED' });
+    await setLock(student.user.id, admin.token, true);
+
+    // Undoing the selection is a separate decision from the lock — an admin
+    // who locked a student on purpose shouldn't have that silently undone
+    // by later correcting the application status.
+    await setStatus(application.body.id, admin.token, { status: 'SHORTLISTED' });
+
+    const profile = await prisma.studentProfile.findUnique({
+      where: { userId: student.user.id },
+    });
+    assert.equal(profile.placementLocked, true);
   });
 
   test('re-confirming SELECTED does not create a duplicate placement', async () => {
@@ -330,6 +362,7 @@ describe('GET /api/placements', () => {
     assert.equal(res.body.length, 1);
     assert.equal(res.body[0].user.email, student.user.email);
     assert.equal(res.body[0].user.passwordHash, undefined);
+    assert.equal(res.body[0].user.placementLocked, false);
   });
 
   test('is forbidden to students', async () => {
@@ -362,6 +395,79 @@ describe('GET /api/placements', () => {
     const res = await api()
       .get('/api/placements/me')
       .set(...auth(admin.token));
+
+    assert.equal(res.status, 403);
+  });
+});
+
+describe('PATCH /api/students/:userId/placement-lock', () => {
+  test('locks a student when the university has placement lock enabled (the default)', async () => {
+    const { admin, student } = await seedScenario();
+
+    const res = await setLock(student.user.id, admin.token, true);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.placementLocked, true);
+  });
+
+  test('unlocks a student', async () => {
+    const { admin, student } = await seedScenario();
+    await setLock(student.user.id, admin.token, true);
+
+    const res = await setLock(student.user.id, admin.token, false);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.placementLocked, false);
+  });
+
+  test('rejects locking when the university has placement lock disabled', async () => {
+    const { admin, student } = await seedScenario();
+    await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({ placementLockEnabled: false });
+
+    const res = await setLock(student.user.id, admin.token, true);
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /enable placement lock/i);
+  });
+
+  test('unlocking is still allowed when placement lock is disabled', async () => {
+    const { admin, student } = await seedScenario();
+    await setLock(student.user.id, admin.token, true);
+    await api()
+      .patch('/api/universities/me')
+      .set(...auth(admin.token))
+      .send({ placementLockEnabled: false });
+
+    const res = await setLock(student.user.id, admin.token, false);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.placementLocked, false);
+  });
+
+  test('rejects a non-boolean locked value', async () => {
+    const { admin, student } = await seedScenario();
+
+    const res = await setLock(student.user.id, admin.token, 'yes');
+
+    assert.equal(res.status, 400);
+  });
+
+  test('404s for a student in a different university', async () => {
+    const { admin } = await seedScenario();
+    const { student: otherStudent } = await seedScenario();
+
+    const res = await setLock(otherStudent.user.id, admin.token, true);
+
+    assert.equal(res.status, 404);
+  });
+
+  test('is forbidden to students', async () => {
+    const { student } = await seedScenario();
+
+    const res = await setLock(student.user.id, student.token, true);
 
     assert.equal(res.status, 403);
   });

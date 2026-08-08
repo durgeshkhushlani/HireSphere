@@ -101,6 +101,14 @@ export function setStudentVerified(userId: string, verified: boolean, token: str
   });
 }
 
+export function setStudentPlacementLock(userId: string, locked: boolean, token: string) {
+  return apiFetch<StudentProfile>(`/students/${userId}/placement-lock`, {
+    method: "PATCH",
+    body: { locked },
+    token,
+  });
+}
+
 export function listFieldDefinitions(token: string) {
   return apiFetch<FieldDefinition[]>("/students/field-definitions", { token });
 }

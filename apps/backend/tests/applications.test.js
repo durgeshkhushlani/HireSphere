@@ -564,6 +564,21 @@ describe('DELETE /api/applications/:id (withdraw)', () => {
     assert.equal(gone.status, 404);
   });
 
+  test('withdraws cleanly when the application has ranked role preferences', async () => {
+    const { student, drive } = await seedScenario();
+    const role = await createDriveRole(drive.id);
+    const created = await applyTo(drive.id, student.token, {
+      responses: { q: 'a' },
+      rolePreferences: [role.id],
+    });
+
+    const res = await api()
+      .delete(`/api/applications/${created.body.id}`)
+      .set(...auth(student.token));
+
+    assert.equal(res.status, 204);
+  });
+
   test('withdrawing deletes the row, allowing a clean re-apply', async () => {
     const { student, drive } = await seedScenario();
     const created = await applyTo(drive.id, student.token);

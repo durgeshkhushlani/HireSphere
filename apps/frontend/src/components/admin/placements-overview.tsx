@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
+import { getMe } from "@/lib/api/auth";
 import { listPlacements, type Placement } from "@/lib/api/placements";
 import { listDrives, type Drive } from "@/lib/api/drives";
+import { setStudentPlacementLock } from "@/lib/api/students";
 import { SearchInput } from "@/components/ui/search-input";
 
 function formatPackage(amount: string | null) {
@@ -19,19 +22,40 @@ export function PlacementsOverview() {
   const { token } = useAuth();
   const [placements, setPlacements] = useState<Placement[] | null>(null);
   const [drives, setDrives] = useState<Drive[] | null>(null);
+  const [placementLockEnabled, setPlacementLockEnabled] = useState(false);
   const [query, setQuery] = useState("");
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
-    Promise.all([listPlacements(token), listDrives(token)])
-      .then(([placementList, driveList]) => {
+    Promise.all([listPlacements(token), listDrives(token), getMe(token)])
+      .then(([placementList, driveList, me]) => {
         setPlacements(placementList);
         setDrives(driveList);
+        setPlacementLockEnabled(me.university.placementLockEnabled);
       })
       .catch((err) =>
         toast.error(err instanceof ApiError ? err.message : "Couldn't load placements")
       );
   }, [token]);
+
+  async function handleToggleLock(userId: string, locked: boolean) {
+    if (!token) return;
+    setTogglingUserId(userId);
+    try {
+      await setStudentPlacementLock(userId, locked, token);
+      setPlacements((prev) =>
+        prev
+          ? prev.map((p) => (p.user.id === userId ? { ...p, user: { ...p.user, placementLocked: locked } } : p))
+          : prev
+      );
+      toast.success(locked ? "Student locked" : "Student unlocked");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't update placement lock");
+    } finally {
+      setTogglingUserId(null);
+    }
+  }
 
   if (placements === null || drives === null) {
     return (
@@ -110,11 +134,28 @@ export function PlacementsOverview() {
                     {p.drive ? ` — ${p.drive.title}` : ""}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold">{formatPackage(p.packageAmount)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(p.placedAt).toLocaleDateString()}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-sm font-bold">{formatPackage(p.packageAmount)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(p.placedAt).toLocaleDateString()}
+                    </div>
                   </div>
+                  <Button
+                    size="sm"
+                    variant={p.user.placementLocked ? "outline" : "default"}
+                    disabled={
+                      togglingUserId === p.user.id || (!p.user.placementLocked && !placementLockEnabled)
+                    }
+                    title={
+                      !p.user.placementLocked && !placementLockEnabled
+                        ? "Enable placement lock in your profile settings first"
+                        : undefined
+                    }
+                    onClick={() => handleToggleLock(p.user.id, !p.user.placementLocked)}
+                  >
+                    {p.user.placementLocked ? "Unlock" : "Lock"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

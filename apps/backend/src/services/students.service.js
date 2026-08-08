@@ -226,6 +226,34 @@ async function setVerified(userId, universityId, verified) {
   });
 }
 
+// Admin-only, scoped like setVerified. Locking requires the university to
+// have opted into placement lock at all (see University.placementLockEnabled)
+// — some universities let a placed student keep applying elsewhere for a
+// better offer, so this isn't automatic on selection anymore, and can't be
+// used at all until an admin turns the feature on. Unlocking is always
+// allowed, since removing a restriction never needs the same gate.
+async function setPlacementLock(userId, universityId, locked) {
+  if (typeof locked !== 'boolean') throw ApiError.badRequest('locked must be a boolean');
+
+  const profile = await prisma.studentProfile.findUnique({ where: { userId }, include: { user: true } });
+  if (!profile || profile.user.universityId !== universityId) {
+    throw ApiError.notFound('Student not found');
+  }
+
+  if (locked) {
+    const university = await prisma.university.findUnique({ where: { id: universityId } });
+    if (!university.placementLockEnabled) {
+      throw ApiError.badRequest('Enable placement lock for your university before locking a student');
+    }
+  }
+
+  return prisma.studentProfile.update({
+    where: { userId },
+    data: { placementLocked: locked },
+    include: { user: true, program: true },
+  });
+}
+
 module.exports = {
   getProfile,
   getFullProfile,
@@ -233,4 +261,5 @@ module.exports = {
   updateProfile,
   listForUniversity,
   setVerified,
+  setPlacementLock,
 };
