@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
   // animation/timer state (like the landing page's typewriter effect)
   // before it can ever progress.
   allowedDevOrigins: ["127.0.0.1"],
+  // Dev-only floating "N" indicator — was overlapping the bug-report button
+  // at bottom-left. Doesn't exist in production builds anyway; disabled
+  // here just to stop it covering dev-mode testing.
+  devIndicators: false,
 };
 
 export default nextConfig;

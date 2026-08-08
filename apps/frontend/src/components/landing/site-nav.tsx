@@ -39,6 +39,9 @@ export function SiteNav() {
       </div>
 
       <div className="hidden items-center gap-3 sm:flex">
+        <Button variant="outline" nativeButton={false} render={<Link href="/demo" />}>
+          Try it out
+        </Button>
         <Button variant="ghost" nativeButton={false} render={<Link href="/auth?mode=login" />}>
           Log in
         </Button>
@@ -70,6 +73,9 @@ export function SiteNav() {
               </a>
             ))}
             <div className="mt-4 flex flex-col gap-2 border-t pt-4">
+              <Button variant="outline" nativeButton={false} render={<Link href="/demo" />}>
+                Try it out
+              </Button>
               <Button
                 variant="outline"
                 nativeButton={false}

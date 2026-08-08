@@ -17,6 +17,7 @@ import { ChatWidget } from "@/components/chat/chat-widget";
 import { ChatPageContextProvider } from "@/lib/chat-page-context";
 import { StudentProfileDialog } from "@/components/student/student-profile-dialog";
 import { AdminProfileDialog } from "@/components/admin/admin-profile-dialog";
+import { DemoBanner } from "@/components/demo/demo-banner";
 
 function initialsFor(name: string | undefined) {
   if (!name) return "?";
@@ -79,6 +80,8 @@ export function DashboardShell({
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
+
+        <DemoBanner />
 
         {user?.role === "STUDENT" ? (
           <StudentProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
