@@ -21,15 +21,19 @@ export function AdminDashboard() {
       </p>
 
       <Tabs defaultValue="drives" className="mt-6">
-        <TabsList className="gap-2 bg-transparent p-0">
-          <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Drives</TabsTrigger>
-          <TabsTrigger value="applicants" className={TAB_TRIGGER_CLASS}>Applicants</TabsTrigger>
-          <TabsTrigger value="placements" className={TAB_TRIGGER_CLASS}>Placements</TabsTrigger>
-          <TabsTrigger value="programs" className={TAB_TRIGGER_CLASS}>Programs</TabsTrigger>
-          <TabsTrigger value="companies" className={TAB_TRIGGER_CLASS}>Companies</TabsTrigger>
-          <TabsTrigger value="students" className={TAB_TRIGGER_CLASS}>Students</TabsTrigger>
-          <TabsTrigger value="notifications" className={TAB_TRIGGER_CLASS}>Notifications</TabsTrigger>
-        </TabsList>
+        {/* 7 tabs never fit a phone-width screen — scroll horizontally
+            instead of silently overflowing the viewport. */}
+        <div className="-mx-6 overflow-x-auto px-6 sm:mx-0 sm:px-0">
+          <TabsList className="w-max gap-2 bg-transparent p-0">
+            <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Drives</TabsTrigger>
+            <TabsTrigger value="applicants" className={TAB_TRIGGER_CLASS}>Applicants</TabsTrigger>
+            <TabsTrigger value="placements" className={TAB_TRIGGER_CLASS}>Placements</TabsTrigger>
+            <TabsTrigger value="programs" className={TAB_TRIGGER_CLASS}>Programs</TabsTrigger>
+            <TabsTrigger value="companies" className={TAB_TRIGGER_CLASS}>Companies</TabsTrigger>
+            <TabsTrigger value="students" className={TAB_TRIGGER_CLASS}>Students</TabsTrigger>
+            <TabsTrigger value="notifications" className={TAB_TRIGGER_CLASS}>Notifications</TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="drives" className="mt-6">
           <DriveManager />
         </TabsContent>

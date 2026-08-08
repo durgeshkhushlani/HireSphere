@@ -53,12 +53,14 @@ export function StudentDashboard() {
       </p>
 
       <Tabs defaultValue="drives" className="mt-6">
-        <TabsList className="gap-2 bg-transparent p-0">
-          <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Browse Drives</TabsTrigger>
-          <TabsTrigger value="applications" className={TAB_TRIGGER_CLASS}>
-            My Applications{applications ? ` (${applications.length})` : ""}
-          </TabsTrigger>
-        </TabsList>
+        <div className="-mx-6 overflow-x-auto px-6 sm:mx-0 sm:px-0">
+          <TabsList className="w-max gap-2 bg-transparent p-0">
+            <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Browse Drives</TabsTrigger>
+            <TabsTrigger value="applications" className={TAB_TRIGGER_CLASS}>
+              My Applications{applications ? ` (${applications.length})` : ""}
+            </TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="drives" className="mt-6">
           <DriveBrowser drives={drives} appliedDriveIds={appliedDriveIds} onApplied={refresh} />
         </TabsContent>
