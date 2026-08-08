@@ -51,6 +51,21 @@ async function getForUniversity(driveId, universityId) {
   return { ...drive, results: await getResults(drive.id) };
 }
 
+// Chat-assistant lookup only — backs the search_drives tool. Same
+// university scoping as every other query here, just a looser filter
+// (partial company name, or an exact id) instead of a single required key.
+async function searchDrives(universityId, { companyQuery, driveId } = {}) {
+  return prisma.drive.findMany({
+    where: {
+      universityId,
+      ...(driveId && { id: driveId }),
+      ...(companyQuery && { company: { name: { contains: companyQuery, mode: 'insensitive' } } }),
+    },
+    include: { company: true, roles: ROLES_ORDER },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 async function create({ companyId, title, description, minCgpa, maxBacklogs }, universityId) {
   if (!companyId || !title) {
     throw ApiError.badRequest('companyId and title are required');
@@ -366,6 +381,7 @@ module.exports = {
   requireScoped,
   listForUniversity,
   getForUniversity,
+  searchDrives,
   create,
   updateDetails,
   updateStatus,

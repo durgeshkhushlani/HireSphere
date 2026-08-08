@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { askChat, type ChatTurn } from "@/lib/api/chat";
+import { useChatPageContext } from "@/lib/chat-page-context";
 
 export function ChatWidget() {
   const { token } = useAuth();
+  const { pageContext } = useChatPageContext();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
@@ -27,7 +29,7 @@ export function ChatWidget() {
     setInput("");
     setSending(true);
     try {
-      const { reply } = await askChat({ message: text, history }, token!);
+      const { reply } = await askChat({ message: text, history, pageContext }, token!);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
       toast.error(
@@ -44,7 +46,9 @@ export function ChatWidget() {
   return (
     <div className="fixed right-5 bottom-5 z-50 flex flex-col items-end">
       {open && (
-        <div className="mb-3 flex h-[420px] w-[320px] flex-col overflow-hidden rounded-xl border bg-card shadow-lg ring-1 ring-foreground/10">
+        // Capped at 320px on larger screens, but shrinks to fit narrow
+        // phones instead of overflowing past the left edge of the viewport.
+        <div className="mb-3 flex h-[420px] w-[min(320px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border bg-card shadow-lg ring-1 ring-foreground/10">
           <div className="flex items-center justify-between border-b bg-primary px-4 py-3 text-primary-foreground">
             <span className="text-sm font-bold">HireSphere Assistant</span>
             <button onClick={() => setOpen(false)} aria-label="Close chat">
@@ -54,7 +58,7 @@ export function ChatWidget() {
           <div ref={listRef} className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                Ask about eligibility, drives, applications, or how HireSphere works.
+                Ask about eligibility, drives, applications, interview prep, or live placement stats.
               </p>
             )}
             {messages.map((m, i) => (
