@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,11 +25,17 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
+import { getMe } from "@/lib/api/auth";
 import { listCompanies, createCompany, type Company } from "@/lib/api/companies";
 import { listUniversityPrograms, type Program } from "@/lib/api/universities";
 import { createDrive, setEligiblePrograms } from "@/lib/api/drives";
 
 const NEW_COMPANY = "__new__";
+
+function copy(value: string, label: string) {
+  navigator.clipboard.writeText(value);
+  toast.success(`${label} copied`);
+}
 
 export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
   const { token, user } = useAuth();
@@ -43,6 +50,11 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [eligibleIds, setEligibleIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [revealed, setRevealed] = useState<{
+    accessCode: string;
+    password: string;
+    universityDomain: string;
+  } | null>(null);
 
   function reset() {
     setCompanyId("");
@@ -52,6 +64,7 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
     setMinCgpa("");
     setMaxBacklogs("");
     setEligibleIds(new Set());
+    setRevealed(null);
   }
 
   function toggleProgram(id: string) {
@@ -65,7 +78,11 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
 
   async function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
-    if (!nextOpen || !token || !user) return;
+    if (!nextOpen) {
+      reset();
+      return;
+    }
+    if (!token || !user) return;
     try {
       const [companyList, programList] = await Promise.all([
         listCompanies(token),
@@ -118,8 +135,12 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
         await setEligiblePrograms(drive.id, [...eligibleIds], token);
       }
       toast.success(`${title} created`);
-      setOpen(false);
-      reset();
+      const me = await getMe(token);
+      setRevealed({
+        accessCode: drive.companyAccess.accessCode,
+        password: drive.companyAccess.password,
+        universityDomain: me.university.domain,
+      });
       onCreated();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't create drive");
@@ -139,6 +160,61 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
           </DialogDescription>
         </DialogHeader>
 
+        {revealed ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">
+              {title} is live. Here&apos;s the company&apos;s one-time portal password — copy it
+              now, since it can&apos;t be shown again (only regenerated).
+            </p>
+            <div className="flex flex-col gap-3 rounded-lg border p-4">
+              <div>
+                <Label className="mb-1 text-xs font-semibold text-muted-foreground">
+                  Portal link
+                </Label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-muted px-2 py-1.5 text-xs">
+                    {window.location.origin}/{revealed.universityDomain}/{revealed.accessCode}
+                  </code>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    onClick={() =>
+                      copy(
+                        `${window.location.origin}/${revealed.universityDomain}/${revealed.accessCode}`,
+                        "Portal link"
+                      )
+                    }
+                  >
+                    <Copy />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label className="mb-1 text-xs font-semibold text-muted-foreground">
+                  Password
+                </Label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-muted px-2 py-1.5 text-xs">
+                    {revealed.password}
+                  </code>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    onClick={() => copy(revealed.password, "Password")}
+                  >
+                    <Copy />
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Already emailed to the company&apos;s contact address if one is on file. You can
+              resend or regenerate it any time from the drive&apos;s Details page.
+            </p>
+          </div>
+        ) : (
         <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
           <div>
             <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">Company</Label>
@@ -252,11 +328,23 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
             )}
           </div>
         </div>
+        )}
 
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Creating…" : "Create drive"}
-          </Button>
+          {revealed ? (
+            <Button
+              onClick={() => {
+                setOpen(false);
+                reset();
+              }}
+            >
+              Done
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Creating…" : "Create drive"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
