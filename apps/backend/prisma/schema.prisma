@@ -50,6 +50,14 @@ enum StudentFieldType {
   @@map("student_field_type")
 }
 
+enum NotificationEvent {
+  NEW_COMPANY
+  NEW_DRIVE
+  STUDENT_SELECTED
+
+  @@map("notification_event")
+}
+
 model University {
   id           String  @id @default(uuid())
   name         String
@@ -64,6 +72,14 @@ model University {
   // physical location regardless of who's looking at the schedule.
   timezone     String  @default("Asia/Kolkata")
 
+  // "Try it out" demo mode: an isolated, throwaway tenant reusing the same
+  // university_id scoping every other query already uses — no separate
+  // isDemo/expiresAt columns needed anywhere else. demoExpiresAt is null for
+  // every real university; demo.service.js sweeps rows where it's in the
+  // past before minting a new demo session.
+  isDemo        Boolean   @default(false) @map("is_demo")
+  demoExpiresAt DateTime? @map("demo_expires_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -72,8 +88,25 @@ model University {
   drives                          Drive[]
   placements                      Placement[]
   studentCustomFieldDefinitions   StudentCustomFieldDefinition[]
+  notificationRecipients          NotificationRecipient[]
 
   @@map("universities")
+}
+
+// Per-university, per-event distribution lists — an admin decides who gets
+// emailed (one address or several) when a new company is added, a new drive
+// opens, or a student gets selected. Nothing here gates access; it's purely
+// a notification target list.
+model NotificationRecipient {
+  id           String            @id @default(uuid())
+  universityId String            @map("university_id")
+  event        NotificationEvent
+  email        String
+
+  university University @relation(fields: [universityId], references: [id])
+
+  @@unique([universityId, event, email])
+  @@map("notification_recipients")
 }
 
 model Program {
@@ -136,6 +169,14 @@ model StudentProfile {
   address           String?
   phone             String?
   verified          Boolean  @default(false)
+
+  // A Cloudinary-hosted PDF, uploaded via a signed direct upload (see
+  // cloudinary.js) — always editable regardless of verified status, unlike
+  // the fixed fields above, since a resume legitimately changes over time.
+  // Required before applying to any drive (enforced in
+  // applications.service.js, not here — nullable so existing profiles don't
+  // break), never required for verification itself.
+  resumeUrl String? @map("resume_url")
 
   user              User                       @relation(fields: [userId], references: [id])
   program           Program                    @relation(fields: [programId], references: [id])
@@ -204,6 +245,24 @@ model Drive {
   minCgpa     Decimal? @map("min_cgpa") @db.Decimal(4, 2)
   maxBacklogs Int?     @map("max_backlogs")
 
+  // Declaring results is a deliberate, separate admin action from closing
+  // the drive — an admin can close applications and still choose to hold
+  // off telling the wider student body who got selected. Once declared,
+  // every student at the university (not just applicants) can see the
+  // selected-student list for this drive.
+  resultsDeclared   Boolean   @default(false) @map("results_declared")
+  resultsDeclaredAt DateTime? @map("results_declared_at")
+
+  // Stamped each time an admin manually moves the drive to OPEN — shown to
+  // students as the drive's "start" date. There's no scheduled auto-open,
+  // only auto-close (below).
+  openedAt DateTime? @map("opened_at")
+
+  // Opt-in — null means "no scheduled close, admin closes it manually".
+  // When set, autoCloseDispatcher.js's poller flips the drive to CLOSED
+  // once this passes, the same background-job pattern as resumeDispatcher.js.
+  autoCloseAt DateTime? @map("auto_close_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -214,8 +273,28 @@ model Drive {
   applications     Application[]
   placements       Placement[]
   roles            DriveRole[]
+  companyAccess    DriveCompanyAccess?
 
   @@map("drives")
+}
+
+// One hiring round (Drive) gets its own portal login for the company side —
+// not one login per company, since the same company may run separate drives
+// across different years/universities, each with its own applicant set.
+// accessCode is globally unique and doubles as the URL segment
+// (hiresphere.app/<university-domain>/<accessCode>); passwordHash is never
+// recoverable — see company-portal.service.js's regenerate flow.
+model DriveCompanyAccess {
+  id           String   @id @default(uuid())
+  driveId      String   @unique @map("drive_id")
+  accessCode   String   @unique @map("access_code")
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  drive Drive @relation(fields: [driveId], references: [id])
+
+  @@map("drive_company_access")
 }
 
 // A drive can cover multiple openings (e.g. "SWE" and "Data Analyst" in the
