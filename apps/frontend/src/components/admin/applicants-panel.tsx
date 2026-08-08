@@ -106,7 +106,35 @@ export function ApplicantsPanel() {
     try {
       await updateApplicationStatus(applicant.id, patch, token);
       toast.success(`Updated ${applicant.studentProfile.user.name}`);
-      loadApplicants(selectedDriveId);
+      // Merge just this one row in place instead of refetching the whole
+      // list. A full refetch briefly sets applicants to null (rendering the
+      // Skeleton loading state for every row), which unmounts and remounts
+      // every ApplicantRow — including ones the admin was still mid-edit on
+      // elsewhere in the list, discarding their unsaved local state. Scoping
+      // the update to just this applicant's id leaves every sibling row's
+      // props/state completely untouched.
+      setApplicants((prev) =>
+        prev
+          ? prev.map((a) => {
+              if (a.id !== applicant.id) return a;
+              const wasSelected = a.status === "SELECTED";
+              const nowSelected = patch.status === "SELECTED";
+              const selectedRole = patch.selectedRoleId
+                ? (a.rolePreferences.find((p) => p.driveRole.id === patch.selectedRoleId)
+                    ?.driveRole ?? a.selectedRole)
+                : wasSelected && !nowSelected
+                  ? null
+                  : a.selectedRole;
+              return {
+                ...a,
+                status: patch.status,
+                interviewSlot: patch.interviewSlot ?? a.interviewSlot,
+                interviewVenue: patch.interviewVenue ?? a.interviewVenue,
+                selectedRole,
+              };
+            })
+          : prev
+      );
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't update applicant");
     }
