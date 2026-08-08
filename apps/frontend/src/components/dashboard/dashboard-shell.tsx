@@ -18,6 +18,7 @@ import { ChatPageContextProvider } from "@/lib/chat-page-context";
 import { StudentProfileDialog } from "@/components/student/student-profile-dialog";
 import { AdminProfileDialog } from "@/components/admin/admin-profile-dialog";
 import { DemoBanner } from "@/components/demo/demo-banner";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function initialsFor(name: string | undefined) {
   if (!name) return "?";
@@ -63,22 +64,25 @@ export function DashboardShell({
             </span>
           </Link>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<button className="flex items-center gap-2.5" />}>
-              <span className="text-sm font-semibold">{user?.name}</span>
-              <Avatar size="sm">
-                <AvatarFallback>{initialsFor(user?.name)}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setProfileOpen(true)}>
-                <User /> View profile
-              </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onClick={handleLogout}>
-                <LogOut /> Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<button className="flex items-center gap-2.5" />}>
+                <span className="text-sm font-semibold">{user?.name}</span>
+                <Avatar size="sm">
+                  <AvatarFallback>{initialsFor(user?.name)}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                  <User /> View profile
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                  <LogOut /> Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
         <DemoBanner />

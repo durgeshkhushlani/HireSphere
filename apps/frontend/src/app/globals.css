@@ -83,6 +83,12 @@
   --sidebar-accent-foreground: oklch(0.4 0.11 195);
   --sidebar-border: oklch(0.91 0.004 220);
   --sidebar-ring: oklch(0.55 0.11 195);
+  /* Decorative background dot pattern (landing page hero) — a plain solid
+     tint reads as subtle texture on the light background it was designed
+     for, but the same fixed color is much too bright/harsh against a dark
+     background, so this gets redefined per-theme rather than hardcoded
+     inline where page.tsx uses it. */
+  --dot-pattern: oklch(0.93 0.02 195);
 }
 
 .dark {
@@ -117,6 +123,10 @@
   --sidebar-accent-foreground: oklch(0.62 0.11 195);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.62 0.11 195);
+  /* Much lower opacity than the light-mode dot — same idea as --border/
+     --input above, a faint white tint reads as subtle texture on dark
+     backgrounds where a solid light color would look harsh. */
+  --dot-pattern: oklch(1 0 0 / 10%);
 }
 
 @layer base {

@@ -214,7 +214,7 @@ export function AuthFlow({
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: "radial-gradient(oklch(0.93 0.02 195) 1.5px, transparent 1.5px)",
+            backgroundImage: "radial-gradient(var(--dot-pattern) 1.5px, transparent 1.5px)",
             backgroundSize: "26px 26px",
           }}
         />
