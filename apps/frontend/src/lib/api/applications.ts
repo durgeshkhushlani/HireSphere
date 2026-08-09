@@ -104,6 +104,7 @@ export function bulkSetInterviewSchedule(
     interviewSlot?: string;
     interviewVenue?: string;
     status?: ApplicationStatus;
+    selectedRoleId?: string;
   },
   token: string
 ) {

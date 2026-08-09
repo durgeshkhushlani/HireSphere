@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { getApplicationForm, listDrives, type ApplicationFormQuestion, type Drive } from "@/lib/api/drives";
+import { useAcademicYear } from "@/lib/academic-year-context";
 import {
   listApplicationsForDrive,
   updateApplicationStatus,
@@ -47,6 +48,7 @@ function defaultSlot(timezone: string) {
 
 export function ApplicantsPanel() {
   const { token } = useAuth();
+  const { selectedYear } = useAcademicYear();
   const timezone = useUniversityTimezone();
   const [drives, setDrives] = useState<Drive[]>([]);
   const [selectedDriveId, setSelectedDriveId] = useState("");
@@ -56,16 +58,17 @@ export function ApplicantsPanel() {
   const [bulkSlot, setBulkSlot] = useState("");
   const [bulkVenue, setBulkVenue] = useState("");
   const [bulkStatus, setBulkStatus] = useState<ApplicationStatus | "">("");
+  const [bulkSelectedRoleId, setBulkSelectedRoleId] = useState("");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [query, setQuery] = useState("");
   const selectedDrive = drives.find((d) => d.id === selectedDriveId);
 
   useEffect(() => {
     if (!token) return;
-    listDrives(token)
+    listDrives(token, selectedYear)
       .then(setDrives)
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Couldn't load drives"));
-  }, [token]);
+  }, [token, selectedYear]);
 
   const loadApplicants = useCallback(
     async (driveId: string) => {
@@ -159,6 +162,9 @@ export function ApplicantsPanel() {
   // the latter case by checking each selected applicant's current status.
   const bulkSlotAllowed = bulkStatus === "" || SLOT_STATUSES.includes(bulkStatus);
   const bulkSlotRequired = bulkStatus !== "" && SLOT_STATUSES.includes(bulkStatus);
+  // A shared role is only meaningful — and only required — when the drive
+  // actually has roles defined; a roleless drive can bulk-select freely.
+  const bulkRoleRequired = bulkStatus === "SELECTED" && (selectedDrive?.roles.length ?? 0) > 0;
 
   async function handleBulkSchedule() {
     if (!token || !selectedDriveId) return;
@@ -170,6 +176,14 @@ export function ApplicantsPanel() {
       toast.error("An interview slot is required for OA/Test or Interview status");
       return;
     }
+    if (bulkSlotRequired && !bulkVenue.trim()) {
+      toast.error("An interview venue is required for OA/Test or Interview status");
+      return;
+    }
+    if (bulkRoleRequired && !bulkSelectedRoleId) {
+      toast.error("Pick the role every selected applicant is being placed into");
+      return;
+    }
     setBulkSubmitting(true);
     try {
       await bulkSetInterviewSchedule(
@@ -177,8 +191,9 @@ export function ApplicantsPanel() {
         {
           applicationIds: [...selectedIds],
           interviewSlot: bulkSlotAllowed && bulkSlot ? zonedDatetimeLocalToIso(bulkSlot, timezone) : undefined,
-          interviewVenue: bulkSlotAllowed && bulkVenue ? bulkVenue : undefined,
+          interviewVenue: bulkSlotAllowed && bulkVenue.trim() ? bulkVenue.trim() : undefined,
           status: bulkStatus || undefined,
+          selectedRoleId: bulkStatus === "SELECTED" && bulkSelectedRoleId ? bulkSelectedRoleId : undefined,
         },
         token
       );
@@ -186,6 +201,7 @@ export function ApplicantsPanel() {
       setBulkSlot("");
       setBulkVenue("");
       setBulkStatus("");
+      setBulkSelectedRoleId("");
       loadApplicants(selectedDriveId);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't apply bulk update");
@@ -271,13 +287,14 @@ export function ApplicantsPanel() {
                         if (next !== "" && SLOT_STATUSES.includes(next) && !bulkSlot) {
                           setBulkSlot(defaultSlot(timezone));
                         }
+                        if (next !== "SELECTED") setBulkSelectedRoleId("");
                       }}
                     >
                       <SelectTrigger size="sm" className="w-[140px] text-xs">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
-                        {APPLICATION_STATUS_OPTIONS.filter((s) => s !== "SELECTED").map((s) => (
+                        {APPLICATION_STATUS_OPTIONS.map((s) => (
                           <SelectItem key={s} value={s}>
                             {applicationStatusStyle(s).label}
                           </SelectItem>
@@ -299,6 +316,27 @@ export function ApplicantsPanel() {
                           className="h-7 w-[140px] text-xs"
                         />
                       </>
+                    )}
+                    {bulkRoleRequired && (
+                      <Select
+                        value={bulkSelectedRoleId}
+                        onValueChange={(v) => setBulkSelectedRoleId(v ?? "")}
+                      >
+                        <SelectTrigger size="sm" className="w-[160px] text-xs">
+                          <SelectValue placeholder="Pick role">
+                            {(value: string) =>
+                              selectedDrive?.roles.find((r) => r.id === value)?.title
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedDrive?.roles.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
                     <Button size="sm" disabled={bulkSubmitting} onClick={handleBulkSchedule}>
                       {bulkSubmitting ? "Applying…" : "Apply to selected"}
@@ -398,7 +436,10 @@ function ApplicantRow({
           (applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : "")));
 
   const requiresRole = status === "SELECTED" && applicant.rolePreferences.length > 0;
-  const canSave = dirty && (!requiresRole || !!selectedRoleId) && (!slotEditable || !!interviewSlot);
+  const canSave =
+    dirty &&
+    (!requiresRole || !!selectedRoleId) &&
+    (!slotEditable || (!!interviewSlot && !!interviewVenue.trim()));
 
   return (
     <Card size="sm">
@@ -499,7 +540,7 @@ function ApplicantRow({
             onSave(applicant, {
               status,
               interviewSlot: slotEditable && interviewSlot ? zonedDatetimeLocalToIso(interviewSlot, timezone) : undefined,
-              interviewVenue: slotEditable && interviewVenue ? interviewVenue : undefined,
+              interviewVenue: slotEditable && interviewVenue.trim() ? interviewVenue.trim() : undefined,
               selectedRoleId: requiresRole ? selectedRoleId : undefined,
             })
           }

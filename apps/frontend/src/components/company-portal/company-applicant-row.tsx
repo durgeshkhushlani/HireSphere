@@ -62,7 +62,10 @@ export function CompanyApplicantRow({
       (interviewVenue !== (applicant.interviewVenue ?? "") ||
         interviewSlot !==
           (applicant.interviewSlot ? isoToZonedDatetimeLocal(applicant.interviewSlot, timezone) : "")));
-  const canSave = dirty && (!requiresRole || !!selectedRoleId) && (!slotEditable || !!interviewSlot);
+  const canSave =
+    dirty &&
+    (!requiresRole || !!selectedRoleId) &&
+    (!slotEditable || (!!interviewSlot && !!interviewVenue.trim()));
 
   return (
     <Card size="sm">
@@ -159,7 +162,7 @@ export function CompanyApplicantRow({
             onSave(applicant, {
               status,
               interviewSlot: slotEditable && interviewSlot ? zonedDatetimeLocalToIso(interviewSlot, timezone) : undefined,
-              interviewVenue: slotEditable && interviewVenue ? interviewVenue : undefined,
+              interviewVenue: slotEditable && interviewVenue.trim() ? interviewVenue.trim() : undefined,
               selectedRoleId: requiresRole ? selectedRoleId : undefined,
             })
           }

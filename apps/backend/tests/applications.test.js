@@ -413,6 +413,7 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
     await scheduleFor(drive.id, admin.token, {
       applicationIds: [created.body.id],
       interviewSlot: '2026-09-01T10:00:00.000Z',
+      interviewVenue: 'Room 100',
       status: 'OA_TEST',
     });
 
@@ -507,7 +508,81 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
     }
   });
 
-  test('rejects bulk-selecting — SELECTED needs a per-applicant role choice', async () => {
+  test('rejects bulk-selecting without a role when the drive has roles', async () => {
+    const { admin, student, drive } = await seedScenario();
+    const role = await createDriveRole(drive.id);
+    const created = await applyTo(drive.id, student.token, {
+      responses: { q: 'a' },
+      rolePreferences: [role.id],
+    });
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [created.body.id],
+      status: 'SELECTED',
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('bulk-selects a whole batch into the same shared role', async () => {
+    const { university, program, admin, student, drive } = await seedScenario();
+    const other = await registerStudent(university.id, program.id);
+    const role = await createDriveRole(drive.id, { ctcAmount: 1200000 });
+    const first = await applyTo(drive.id, student.token, {
+      responses: { q: 'a' },
+      rolePreferences: [role.id],
+    });
+    const second = await applyTo(drive.id, other.token, {
+      responses: { q: 'a' },
+      rolePreferences: [role.id],
+    });
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [first.body.id, second.body.id],
+      status: 'SELECTED',
+      selectedRoleId: role.id,
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.length, 2);
+    for (const application of res.body) {
+      assert.equal(application.status, 'SELECTED');
+      assert.equal(application.selectedRoleId, role.id);
+    }
+
+    const placements = await prisma.placement.findMany({ where: { driveId: drive.id } });
+    assert.equal(placements.length, 2);
+    for (const placement of placements) {
+      assert.equal(placement.driveRoleId, role.id);
+      assert.equal(Number(placement.packageAmount), 1200000);
+    }
+  });
+
+  test('rejects bulk-selecting into a role an applicant never ranked', async () => {
+    const { university, program, admin, student, drive } = await seedScenario();
+    const other = await registerStudent(university.id, program.id);
+    const roleA = await createDriveRole(drive.id, { title: 'Role A' });
+    const roleB = await createDriveRole(drive.id, { title: 'Role B' });
+    const first = await applyTo(drive.id, student.token, {
+      responses: { q: 'a' },
+      rolePreferences: [roleA.id],
+    });
+    const second = await applyTo(drive.id, other.token, {
+      responses: { q: 'a' },
+      rolePreferences: [roleB.id],
+    });
+
+    const res = await scheduleFor(drive.id, admin.token, {
+      applicationIds: [first.body.id, second.body.id],
+      status: 'SELECTED',
+      selectedRoleId: roleA.id,
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(await prisma.placement.count(), 0);
+  });
+
+  test('bulk-selecting on a drive with no roles needs no selectedRoleId', async () => {
     const { admin, student, drive } = await seedScenario();
     const created = await applyTo(drive.id, student.token);
 
@@ -516,7 +591,9 @@ describe('PATCH /api/drives/:driveId/applications/interview-schedule (global app
       status: 'SELECTED',
     });
 
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 200);
+    assert.equal(res.body[0].status, 'SELECTED');
+    assert.equal(await prisma.placement.count(), 1);
   });
 
   test('rejects a bulk status change touching an already-Selected applicant', async () => {

@@ -326,6 +326,10 @@ async function updateStatus(
   if (SLOT_ALLOWED_STATUSES.includes(status) && interviewSlot === undefined && !application.interviewSlot) {
     throw ApiError.badRequest('An interview slot is required for OA/Test or Interview status');
   }
+  const finalVenue = interviewVenue !== undefined ? interviewVenue : application.interviewVenue;
+  if (SLOT_ALLOWED_STATUSES.includes(status) && !finalVenue?.trim()) {
+    throw ApiError.badRequest('An interview venue is required for OA/Test or Interview status');
+  }
 
   const wasSelected = application.status === 'SELECTED';
   const nowSelected = status === 'SELECTED';
@@ -423,7 +427,7 @@ async function updateStatus(
 async function bulkSetInterviewSchedule(
   driveId,
   universityId,
-  { applicationIds, interviewSlot, interviewVenue, status }
+  { applicationIds, interviewSlot, interviewVenue, status, selectedRoleId }
 ) {
   if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
     throw ApiError.badRequest('applicationIds must be a non-empty array');
@@ -434,21 +438,13 @@ async function bulkSetInterviewSchedule(
   if (status !== undefined && !APPLICATION_STATUSES.includes(status)) {
     throw ApiError.badRequest(`status must be one of: ${APPLICATION_STATUSES.join(', ')}`);
   }
-  // SELECTED needs a per-applicant role choice (and creates a placement) —
-  // not something that's safe to do identically across a batch. Same for
-  // moving *off* SELECTED, which must release the placement lock. Both stay
-  // on the individual-row flow, which already handles them correctly.
-  if (status === 'SELECTED') {
-    throw ApiError.badRequest(
-      'Bulk-selecting is not supported — mark each applicant Selected individually so their role can be chosen'
-    );
-  }
 
   const drive = await drivesService.requireScoped(driveId, universityId);
   const uniqueIds = [...new Set(applicationIds)];
 
   const applications = await prisma.application.findMany({
     where: { id: { in: uniqueIds }, driveId: drive.id },
+    include: { rolePreferences: true, studentProfile: { include: { user: { select: { name: true } } } } },
   });
   if (applications.length !== uniqueIds.length) {
     throw ApiError.badRequest('One or more applicationIds do not belong to this drive');
@@ -457,6 +453,33 @@ async function bulkSetInterviewSchedule(
     throw ApiError.badRequest(
       'One or more selected applicants are already Selected — change their status individually so the placement lock releases correctly'
     );
+  }
+
+  // Bulk-selecting a whole batch into the *same* role at once (e.g. 10
+  // candidates all hired as "Software Engineer" in one go) — every applicant
+  // in the batch must have actually ranked that role themselves, so this can
+  // never place someone into a role they never applied for. Moving *off*
+  // SELECTED in bulk still isn't supported, since releasing the placement
+  // lock correctly needs the individual-row flow.
+  let resolvedRole = null;
+  if (status === 'SELECTED') {
+    const roleCount = await prisma.driveRole.count({ where: { driveId: drive.id } });
+    if (roleCount > 0) {
+      if (!selectedRoleId) {
+        throw ApiError.badRequest(
+          'selectedRoleId is required to bulk-select — pick the role every applicant in this batch is being placed into'
+        );
+      }
+      const missingPreference = applications.find(
+        (a) => !a.rolePreferences.some((p) => p.driveRoleId === selectedRoleId)
+      );
+      if (missingPreference) {
+        throw ApiError.badRequest(
+          'Every applicant in the batch must have ranked the selected role as a preference'
+        );
+      }
+      resolvedRole = await prisma.driveRole.findUnique({ where: { id: selectedRoleId } });
+    }
   }
 
   if (interviewSlot !== undefined || interviewVenue !== undefined) {
@@ -473,15 +496,70 @@ async function bulkSetInterviewSchedule(
   ) {
     throw ApiError.badRequest('An interview slot is required for OA/Test or Interview status');
   }
+  if (status !== undefined && SLOT_ALLOWED_STATUSES.includes(status)) {
+    const venueMissing =
+      interviewVenue !== undefined
+        ? !interviewVenue.trim()
+        : applications.some((a) => !a.interviewVenue);
+    if (venueMissing) {
+      throw ApiError.badRequest('An interview venue is required for OA/Test or Interview status');
+    }
+  }
 
-  await prisma.application.updateMany({
-    where: { id: { in: uniqueIds } },
-    data: {
-      ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
-      ...(interviewVenue !== undefined && { interviewVenue }),
-      ...(status !== undefined && { status }),
-    },
+  const defaultPackage = resolvedRole
+    ? resolvedRole.offerType === 'JOB'
+      ? resolvedRole.ctcAmount
+      : resolvedRole.stipendAmount
+    : undefined;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.application.updateMany({
+      where: { id: { in: uniqueIds } },
+      data: {
+        ...(interviewSlot !== undefined && { interviewSlot: new Date(interviewSlot) }),
+        ...(interviewVenue !== undefined && { interviewVenue }),
+        ...(status !== undefined && { status }),
+        ...(resolvedRole && { selectedRoleId: resolvedRole.id }),
+      },
+    });
+
+    if (status === 'SELECTED') {
+      await tx.placement.createMany({
+        data: applications.map((a) => ({
+          universityId,
+          userId: a.studentProfileId,
+          companyId: drive.companyId,
+          driveId: drive.id,
+          ...(resolvedRole && { driveRoleId: resolvedRole.id }),
+          ...(defaultPackage != null && { packageAmount: defaultPackage }),
+        })),
+      });
+    }
   });
+
+  if (status === 'SELECTED') {
+    const company = await prisma.company.findUnique({
+      where: { id: drive.companyId },
+      select: { name: true },
+    });
+    for (const a of applications) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await notificationsService.notify(universityId, 'STUDENT_SELECTED', {
+          subject: `Student selected: ${a.studentProfile.user.name}`,
+          text: [
+            'A student was marked Selected on HireSphere.',
+            '',
+            `Student: ${a.studentProfile.user.name}`,
+            `Drive: ${drive.title}`,
+            `Company: ${company?.name ?? '(unknown)'}`,
+          ].join('\n'),
+        });
+      } catch (err) {
+        console.error('Failed to send student-selected notification:', err);
+      }
+    }
+  }
 
   return prisma.application.findMany({
     where: { id: { in: uniqueIds } },

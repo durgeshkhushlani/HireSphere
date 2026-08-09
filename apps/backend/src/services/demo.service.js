@@ -153,16 +153,62 @@ async function startDemo() {
       },
     });
 
+    // Every verified student has a fully filled-out profile — an admin
+    // browsing the Students tab in the demo shouldn't see a wall of blanks,
+    // since that's not representative of what a real, in-use HireSphere
+    // looks like. Rohan is the deliberate exception: he's unverified, and an
+    // empty profile is exactly what "hasn't finished filling this in yet"
+    // should look like, so his fields are left blank on purpose.
     const studentSeeds = [
-      { name: 'Aarav Mehta', cgpa: '8.70', backlogCount: 0, verified: true },
-      { name: 'Diya Kapoor', cgpa: '7.90', backlogCount: 0, verified: true },
+      {
+        name: 'Aarav Mehta',
+        cgpa: '8.70',
+        backlogCount: 0,
+        verified: true,
+        tenthPercentage: '92.40',
+        twelfthPercentage: '89.20',
+        bloodGroup: 'O+',
+        address: 'Sector 15, Rohini, New Delhi',
+        phone: '9876500001',
+      },
+      {
+        name: 'Diya Kapoor',
+        cgpa: '7.90',
+        backlogCount: 0,
+        verified: true,
+        tenthPercentage: '90.10',
+        twelfthPercentage: '87.60',
+        bloodGroup: 'A+',
+        address: 'Koramangala, Bengaluru',
+        phone: '9876500002',
+      },
       { name: 'Rohan Iyer', cgpa: '6.80', backlogCount: 1, verified: false },
-      { name: 'Sneha Reddy', cgpa: '9.10', backlogCount: 0, verified: true },
+      {
+        name: 'Sneha Reddy',
+        cgpa: '9.10',
+        backlogCount: 0,
+        verified: true,
+        tenthPercentage: '95.30',
+        twelfthPercentage: '91.80',
+        bloodGroup: 'B+',
+        address: 'Banjara Hills, Hyderabad',
+        phone: '9876500004',
+      },
       // Handed to the visitor as the "Continue as Student" login — unlike
       // the four above, this one is unlocked and has no applications yet,
       // so the demo can actually be used to try the apply flow, not just
       // view a pre-filled history.
-      { name: 'Kabir Nair', cgpa: '8.20', backlogCount: 0, verified: true },
+      {
+        name: 'Kabir Nair',
+        cgpa: '8.20',
+        backlogCount: 0,
+        verified: true,
+        tenthPercentage: '88.70',
+        twelfthPercentage: '85.40',
+        bloodGroup: 'AB+',
+        address: 'Panampilly Nagar, Kochi',
+        phone: '9876500005',
+      },
     ];
     const students = [];
     for (const [i, s] of studentSeeds.entries()) {
@@ -183,6 +229,13 @@ async function startDemo() {
           backlogCount: s.backlogCount,
           verified: s.verified,
           studentId: `DEMO${String(i + 1).padStart(3, '0')}`,
+          ...(s.tenthPercentage && {
+            tenthPercentage: s.tenthPercentage,
+            twelfthPercentage: s.twelfthPercentage,
+            bloodGroup: s.bloodGroup,
+            address: s.address,
+            phone: s.phone,
+          }),
           // Applying to a drive now requires a resume on file — without
           // this, the demo student handed to a "Continue as Student"
           // visitor couldn't actually use the apply flow.
