@@ -51,6 +51,7 @@ export function DemoBanner() {
       </span>
       <button
         onClick={handleSwitch}
+        data-tour="demo-switch"
         className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-accent-foreground transition-colors hover:bg-accent/90"
       >
         <ArrowLeftRight className="size-3.5" />

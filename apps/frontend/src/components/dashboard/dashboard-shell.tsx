@@ -18,6 +18,7 @@ import { ChatPageContextProvider } from "@/lib/chat-page-context";
 import { StudentProfileDialog } from "@/components/student/student-profile-dialog";
 import { AdminProfileDialog } from "@/components/admin/admin-profile-dialog";
 import { DemoBanner } from "@/components/demo/demo-banner";
+import { DemoTour } from "@/components/demo/demo-tour";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 function initialsFor(name: string | undefined) {
@@ -59,7 +60,10 @@ export function DashboardShell({
               className="rounded-[8px]"
             />
             <span className="font-heading text-base font-extrabold">HireSphere</span>
-            <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+            <span
+              data-tour="role-badge"
+              className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary"
+            >
               {roleLabel}
             </span>
           </Link>
@@ -86,6 +90,7 @@ export function DashboardShell({
         </header>
 
         <DemoBanner />
+        <DemoTour userId={user?.id} />
 
         {user?.role === "STUDENT" ? (
           <StudentProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
