@@ -1,0 +1,25 @@
+name: Keep backend alive
+
+# Render's free tier spins the backend down after 15 minutes with no
+# inbound requests — which would also stop the in-process background
+# pollers (autoCloseDispatcher.js, resumeDispatcher.js), since those only
+# run while the Node process is actually alive. Pinging /health well inside
+# that 15-minute window keeps the service (and its pollers) running
+# continuously. GitHub Actions minutes are unlimited on a public repo, so
+# this costs nothing.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://hiresphere-backend-cbde.onrender.com/health)
+          echo "Health check responded with status $status"
+          if [ "$status" != "200" ]; then
+            echo "::warning::Backend health check returned $status instead of 200"
+          fi
