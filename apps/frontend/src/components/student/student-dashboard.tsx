@@ -53,7 +53,7 @@ export function StudentDashboard() {
       </p>
 
       <Tabs defaultValue="drives" className="mt-6">
-        <div className="-mx-6 overflow-x-auto px-6 sm:mx-0 sm:px-0">
+        <div className="-mx-6 overflow-x-auto overflow-y-hidden px-6 sm:mx-0 sm:px-0">
           <TabsList className="w-max gap-2 bg-transparent p-0">
             <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Browse Drives</TabsTrigger>
             <TabsTrigger value="applications" className={TAB_TRIGGER_CLASS}>
