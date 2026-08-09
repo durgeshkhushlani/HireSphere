@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { resetDb, disconnect, prisma } = require('./helpers/db');
 const { api, auth } = require('./helpers/factories');
 const demoController = require('../src/controllers/demo.controller');
+const companyPortalService = require('../src/services/company-portal.service');
 
 beforeEach(async () => {
   await resetDb();
@@ -98,6 +99,34 @@ describe('POST /api/demo/start', () => {
 
     await startDemo();
 
+    const stillThere = await prisma.university.findUnique({
+      where: { id: first.body.admin.user.universityId },
+    });
+    assert.equal(stillThere, null);
+  });
+
+  // Regression test for a real production incident: a demo drive that had
+  // ever had company-portal access generated for it (e.g. an admin created
+  // an extra drive through the normal UI during their session, which always
+  // creates access) couldn't be swept — cleanupExpired's children-before-
+  // parents delete order was missing DriveCompanyAccess, so the FK violation
+  // threw, which broke *every* subsequent /api/demo/start call globally
+  // (cleanupExpired has no per-university error isolation).
+  test('sweeps an expired demo university even when one of its drives has company-portal access', async () => {
+    const first = await startDemo();
+    const drives = await api()
+      .get('/api/drives')
+      .set(...auth(first.body.admin.token));
+    await companyPortalService.createAccess(drives.body[0].id);
+
+    await prisma.university.update({
+      where: { id: first.body.admin.user.universityId },
+      data: { demoExpiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const second = await startDemo();
+
+    assert.equal(second.status, 201);
     const stillThere = await prisma.university.findUnique({
       where: { id: first.body.admin.user.universityId },
     });

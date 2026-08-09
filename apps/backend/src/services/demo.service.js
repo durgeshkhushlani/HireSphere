@@ -79,6 +79,12 @@ async function cleanupExpired() {
       await tx.applicationForm.deleteMany({ where: { driveId: { in: driveIds } } });
       await tx.driveEligibleProgram.deleteMany({ where: { driveId: { in: driveIds } } });
       await tx.driveRole.deleteMany({ where: { id: { in: driveRoleIds } } });
+      // A drive gets company-portal access the moment an admin views it (or
+      // a company logs in during a demo session) — missing this delete was
+      // the actual production bug: any demo university whose drives had
+      // ever had access generated couldn't be cleaned up, which permanently
+      // broke every subsequent /api/demo/start call once one got stuck.
+      await tx.driveCompanyAccess.deleteMany({ where: { driveId: { in: driveIds } } });
       await tx.drive.deleteMany({ where: { universityId } });
       await tx.studentCustomFieldDefinition.deleteMany({ where: { universityId } });
       await tx.studentProfile.deleteMany({ where: { userId: { in: studentProfileIds } } });
