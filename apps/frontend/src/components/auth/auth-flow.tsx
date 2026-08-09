@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { OtpInput } from "@/components/auth/otp-input";
 import { VerifyUniversityCheck } from "@/components/auth/verify-university";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import * as authApi from "@/lib/api/auth";
@@ -209,6 +210,7 @@ export function AuthFlow({
       >
         <ArrowLeft className="size-4" />
       </Link>
+      <ThemeToggle className="absolute top-6 right-6 z-10" />
 
       <div className="relative hidden w-[42%] flex-col items-center justify-center overflow-hidden border-r bg-muted/60 p-14 lg:flex">
         <div

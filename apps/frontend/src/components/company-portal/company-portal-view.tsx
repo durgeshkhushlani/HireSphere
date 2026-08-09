@@ -17,6 +17,7 @@ import {
 } from "@/lib/company-portal-session";
 import { listApplicationsForDrive, updateApplicationStatus, type ApplicantEntry } from "@/lib/api/applications";
 import { CompanyApplicantRow, type SavePatch } from "./company-applicant-row";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function CompanyPortalView({
   universityDomain,
@@ -88,7 +89,8 @@ export function CompanyPortalView({
 
   if (!session) {
     return (
-      <div className="flex min-h-full flex-1 items-center justify-center p-8">
+      <div className="relative flex min-h-full flex-1 items-center justify-center p-8">
+        <ThemeToggle className="absolute top-6 right-6" />
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5">
             <Image src="/brand/icon.png" alt="" width={32} height={32} className="rounded-[9px]" />
@@ -131,9 +133,12 @@ export function CompanyPortalView({
             <div className="text-xs text-muted-foreground">{session.drive.companyName}</div>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          Log out
-        </Button>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            Log out
+          </Button>
+        </div>
       </header>
 
       <main className="flex-1 bg-muted/30 px-6 py-8 sm:px-8">

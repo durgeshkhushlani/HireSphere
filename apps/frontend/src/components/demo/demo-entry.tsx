@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Clock, GraduationCap, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { startDemo, type DemoSession } from "@/lib/api/demo";
@@ -69,6 +70,7 @@ export function DemoEntry() {
       >
         <ArrowLeft className="size-4" />
       </Link>
+      <ThemeToggle className="absolute top-6 right-6" />
 
       <div className="w-full max-w-md text-center">
         <Link href="/" className="mb-8 inline-flex items-center gap-2.5">
