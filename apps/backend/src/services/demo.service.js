@@ -51,7 +51,14 @@ async function cleanupExpired() {
   });
 
   for (const { id: universityId } of expired) {
-    await prisma.$transaction(async (tx) => {
+    // One university failing to clean up (e.g. an unforeseen FK from some
+    // future relation, the same failure mode that twice took down every
+    // demo session site-wide before this) must never block the others —
+    // or block new sessions from starting at all, since startDemo() awaits
+    // this whole function before creating anything. Log and move on; the
+    // stuck university just lingers until the underlying cause is fixed.
+    try {
+      await prisma.$transaction(async (tx) => {
       const studentProfileIds = (
         await tx.studentProfile.findMany({
           where: { user: { universityId } },
@@ -90,8 +97,18 @@ async function cleanupExpired() {
       await tx.studentProfile.deleteMany({ where: { userId: { in: studentProfileIds } } });
       await tx.universityProgram.deleteMany({ where: { universityId } });
       await tx.user.deleteMany({ where: { universityId } });
+      // Same class of bug as driveCompanyAccess above: any admin who ever
+      // subscribed a recipient (Notifications tab) during their demo session
+      // left a row with a direct FK to the university, which blocked the
+      // final delete. Checked every other universityId FK in the schema
+      // (UniversityProgram, User, Drive, StudentCustomFieldDefinition,
+      // Placement) — all already covered above; this was the only gap.
+      await tx.notificationRecipient.deleteMany({ where: { universityId } });
       await tx.university.delete({ where: { id: universityId } });
-    });
+      });
+    } catch (err) {
+      console.error(`Failed to clean up expired demo university ${universityId}:`, err);
+    }
   }
 
   return expired.length;

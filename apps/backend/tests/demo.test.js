@@ -111,13 +111,39 @@ describe('POST /api/demo/start', () => {
   // creates access) couldn't be swept — cleanupExpired's children-before-
   // parents delete order was missing DriveCompanyAccess, so the FK violation
   // threw, which broke *every* subsequent /api/demo/start call globally
-  // (cleanupExpired has no per-university error isolation).
+  // (cleanupExpired originally had no per-university error isolation either
+  // — now fixed alongside this, see the try/catch around the loop body).
   test('sweeps an expired demo university even when one of its drives has company-portal access', async () => {
     const first = await startDemo();
     const drives = await api()
       .get('/api/drives')
       .set(...auth(first.body.admin.token));
     await companyPortalService.createAccess(drives.body[0].id);
+
+    await prisma.university.update({
+      where: { id: first.body.admin.user.universityId },
+      data: { demoExpiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const second = await startDemo();
+
+    assert.equal(second.status, 201);
+    const stillThere = await prisma.university.findUnique({
+      where: { id: first.body.admin.user.universityId },
+    });
+    assert.equal(stillThere, null);
+  });
+
+  // Same class of production incident as above, one step later: an admin
+  // who subscribed a notification recipient during their demo session left
+  // a row with a direct FK to the university, which blocked the final
+  // tx.university.delete() even after every drive-scoped row was cleared.
+  test('sweeps an expired demo university even when it has a notification recipient', async () => {
+    const first = await startDemo();
+    await api()
+      .post('/api/notification-recipients')
+      .set(...auth(first.body.admin.token))
+      .send({ event: 'NEW_DRIVE', email: 'placement@demo.edu' });
 
     await prisma.university.update({
       where: { id: first.body.admin.user.universityId },
