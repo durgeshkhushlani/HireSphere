@@ -1,5 +1,5 @@
 const ApiError = require('../lib/ApiError');
-const groq = require('../lib/groq');
+const gemini = require('../lib/gemini');
 const chatTools = require('./chat-tools');
 
 const SYSTEM_PROMPT = `You are the HireSphere assistant. HireSphere is a university campus placement
@@ -9,6 +9,11 @@ roles when relevant), their own profile/applications, and real platform statisti
 unrelated to HireSphere or placements. Only state a specific number, statistic, or personal detail if
 a tool call returned it — never guess or estimate one. Keep answers focused; expand into more detail
 only when the question calls for it (e.g. interview prep).
+
+Reply in plain text only — no Markdown. Never use *asterisks* or **double asterisks** for emphasis
+or bullets, no #headings, no backtick code formatting. The chat widget displays your reply as raw
+text, so any Markdown syntax shows up literally instead of being rendered. Use plain sentences and,
+where a list genuinely helps, line breaks with a dash ("- ") instead of asterisks.
 
 Always try a tool call first for anything data-shaped, including short/fragment questions —
 "google listed?", "opshub roles?", and "is X hiring?" all mean the same thing as "is <company>
@@ -179,7 +184,7 @@ async function generateReply(baseMessages, tools, callerContext) {
   const MAX_TOOL_HOPS = 3;
   const messages = [...baseMessages];
 
-  let reply = await groq.chatCompletion(messages, tools);
+  let reply = await gemini.chatCompletion(messages, tools);
   let hops = 0;
 
   while (reply.tool_calls && reply.tool_calls.length > 0 && hops < MAX_TOOL_HOPS) {
@@ -201,14 +206,14 @@ async function generateReply(baseMessages, tools, callerContext) {
       messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
     }
     hops += 1;
-    reply = await groq.chatCompletion(messages, tools);
+    reply = await gemini.chatCompletion(messages, tools);
   }
 
   // Hit the hop cap and the model still wants another tool call: force a
   // final plain-text answer from whatever's already been gathered rather
   // than leaking a raw, unexecuted tool-call attempt into the reply.
   if (reply.tool_calls && reply.tool_calls.length > 0) {
-    reply = await groq.chatCompletion(messages);
+    reply = await gemini.chatCompletion(messages);
   }
 
   return reply;
@@ -217,9 +222,8 @@ async function generateReply(baseMessages, tools, callerContext) {
 // Occasionally the model narrates or fakes a tool call as plain text instead
 // of actually invoking it through the real function-calling mechanism (e.g.
 // "search_drives({\"status\": \"OPEN\"})" or "(get_my_applications tool
-// call)") — a known Groq/llama quirk, not specific to any one account or
-// database state. The system prompt already tells it not to; this is the
-// hard backstop for when it does it anyway: any real tool name showing up
+// call)"). The system prompt already tells it not to; this is the hard
+// backstop for when it does it anyway: any real tool name showing up
 // literally in the reply text is a reliable enough signal, since a genuine
 // natural-language answer has no reason to contain it.
 function leaksToolName(content, toolNames) {
@@ -255,7 +259,7 @@ async function askChat(user, { message, history, pageContext }) {
 
     // One retry from the original (unmutated) conversation state — the same
     // question often gets a clean tool call on a second try, same reasoning
-    // as the tool_use_failed retry in groq.js.
+    // as the 400-triggered retry in gemini.js.
     if (leaksToolName(reply.content, toolNames)) {
       reply = await generateReply(messages, tools, callerContext);
     }
@@ -265,10 +269,10 @@ async function askChat(user, { message, history, pageContext }) {
       reply = { content: "I wasn't able to look that up cleanly just now — could you try asking again?" };
     }
   } catch (err) {
-    // Groq's raw rate-limit error is a wall of JSON meant for a developer,
-    // not something to show a student/admin — surface a short, actionable
-    // message instead, with a real wait time when Groq gave us one.
-    if (err.groqStatus === 429) {
+    // The provider's raw rate-limit error is a wall of JSON meant for a
+    // developer, not something to show a student/admin — surface a short,
+    // actionable message instead, with a real wait time when it gave us one.
+    if (err.apiStatus === 429) {
       const wait = err.retryAfterSeconds ? `${err.retryAfterSeconds}s` : 'about a minute';
       throw ApiError.tooManyRequests(`HireSphere Assistant has hit its usage limit — try again in ${wait}.`);
     }

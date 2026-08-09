@@ -3,7 +3,7 @@ const applicationsService = require('./applications.service');
 const drivesService = require('./drives.service');
 const studentsService = require('./students.service');
 
-// Groq (OpenAI-compatible) tool schemas. The model can only ever pick one of
+// Gemini (OpenAI-compatible) tool schemas. The model can only ever pick one of
 // these fixed, pre-built functions — it never sees or writes SQL. Every
 // executor scopes itself with callerContext (from the JWT), never from
 // model-supplied args. Role gating happens TWICE, deliberately: once by

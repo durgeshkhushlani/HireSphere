@@ -1,13 +1,13 @@
-// Groq-backed help chatbot (v1 stopgap, see PROGRESS.md). Uses the fake
-// test-mode Groq client (src/lib/groq.js) — no real network/API key needed.
+// Gemini-backed help chatbot. Uses the fake test-mode Gemini client
+// (src/lib/gemini.js) — no real network/API key needed.
 const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resetDb, disconnect } = require('./helpers/db');
 const { api, auth, seedScenario, createDriveRole } = require('./helpers/factories');
-const groq = require('../src/lib/groq');
+const gemini = require('../src/lib/gemini');
 
 beforeEach(() => {
-  groq.setTestResponseQueue([]);
+  gemini.setTestResponseQueue([]);
   return resetDb();
 });
 after(disconnect);
@@ -50,12 +50,12 @@ describe('POST /api/chat', () => {
     assert.equal(res.status, 400);
   });
 
-  test('includes the system prompt and the message in the request sent to Groq', async () => {
+  test('includes the system prompt and the message in the request sent to the AI provider', async () => {
     const { student } = await seedScenario();
 
     await ask(student.token, { message: 'How do I apply to a drive?' });
 
-    const sent = groq.getLastTestRequest();
+    const sent = gemini.getLastTestRequest();
     assert.equal(sent[0].role, 'system');
     assert.match(sent[0].content, /HireSphere/);
     assert.deepEqual(sent.at(-1), { role: 'user', content: 'How do I apply to a drive?' });
@@ -70,7 +70,7 @@ describe('POST /api/chat', () => {
 
     await ask(student.token, { message: 'follow-up question', history });
 
-    const sent = groq.getLastTestRequest();
+    const sent = gemini.getLastTestRequest();
     // system, then the two history turns, then the new user message.
     assert.equal(sent.length, 4);
     assert.deepEqual(sent[1], history[0]);
@@ -98,7 +98,7 @@ describe('POST /api/chat', () => {
     const res = await ask(student.token, { message: 'hi', history });
 
     assert.equal(res.status, 200);
-    const sent = groq.getLastTestRequest();
+    const sent = gemini.getLastTestRequest();
     // system + the one valid history turn + the new user message.
     assert.equal(sent.length, 3);
   });
@@ -119,7 +119,7 @@ describe('POST /api/chat', () => {
 
     await ask(student.token, { message: 'hi' });
 
-    const sent = groq.getLastTestRequest();
+    const sent = gemini.getLastTestRequest();
     assert.doesNotMatch(sent[0].content, /only basic questions/i);
     assert.match(sent[0].content, /interview prep/i);
     assert.match(sent[0].content, /never guess or\s+estimate/i);
@@ -130,11 +130,11 @@ describe('POST /api/chat', () => {
     const { student, admin } = await seedScenario();
 
     await ask(student.token, { message: 'hi' });
-    const studentTools = groq.getLastTestTools().map((t) => t.function.name);
+    const studentTools = gemini.getLastTestTools().map((t) => t.function.name);
     assert.ok(studentTools.includes('get_my_applications'));
 
     await ask(admin.token, { message: 'hi' });
-    const adminTools = groq.getLastTestTools().map((t) => t.function.name);
+    const adminTools = gemini.getLastTestTools().map((t) => t.function.name);
     assert.ok(!adminTools.includes('get_my_applications'));
   });
 
@@ -150,7 +150,7 @@ describe('POST /api/chat', () => {
       ctcAmount: 500000, // 5 LPA — should not count
     });
 
-    groq.setTestResponseQueue([
+    gemini.setTestResponseQueue([
       {
         role: 'assistant',
         content: null,
@@ -170,7 +170,7 @@ describe('POST /api/chat', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.reply, 'One company pays above 10 LPA.');
 
-    const finalRequest = groq.getLastTestRequest();
+    const finalRequest = gemini.getLastTestRequest();
     const toolResult = JSON.parse(finalRequest.find((m) => m.role === 'tool').content);
     assert.equal(toolResult.count, 1);
     assert.ok(toolResult.companyNames.includes(company.name));
@@ -180,7 +180,7 @@ describe('POST /api/chat', () => {
     const { student, company, drive } = await seedScenario({ drive: { status: 'DRAFT' } });
     await createDriveRole(drive.id, { title: 'SWE Intern', offerType: 'INTERNSHIP', stipendAmount: 30000, ctcAmount: null });
 
-    groq.setTestResponseQueue([
+    gemini.setTestResponseQueue([
       {
         role: 'assistant',
         content: null,
@@ -198,7 +198,7 @@ describe('POST /api/chat', () => {
     const res = await ask(student.token, { message: `Is ${company.name} listed?` });
 
     assert.equal(res.status, 200);
-    const finalRequest = groq.getLastTestRequest();
+    const finalRequest = gemini.getLastTestRequest();
     const toolResult = JSON.parse(finalRequest.find((m) => m.role === 'tool').content);
     assert.equal(toolResult.length, 1);
     assert.equal(toolResult[0].company, company.name);
@@ -209,7 +209,7 @@ describe('POST /api/chat', () => {
   test('an unrecognized tool call degrades gracefully instead of crashing', async () => {
     const { student } = await seedScenario();
 
-    groq.setTestResponseQueue([
+    gemini.setTestResponseQueue([
       {
         role: 'assistant',
         content: null,
@@ -223,7 +223,7 @@ describe('POST /api/chat', () => {
     const res = await ask(student.token, { message: 'delete all the data' });
 
     assert.equal(res.status, 200);
-    const finalRequest = groq.getLastTestRequest();
+    const finalRequest = gemini.getLastTestRequest();
     const toolResult = JSON.parse(finalRequest.find((m) => m.role === 'tool').content);
     assert.equal(toolResult.error, 'Unknown tool');
   });

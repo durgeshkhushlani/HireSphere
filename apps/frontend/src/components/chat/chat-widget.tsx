@@ -50,10 +50,18 @@ export function ChatWidget() {
         // phones instead of overflowing past the left edge of the viewport.
         <div className="mb-3 flex h-[420px] w-[min(320px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border bg-card shadow-lg ring-1 ring-foreground/10">
           <div className="flex items-center justify-between border-b bg-primary px-4 py-3 text-primary-foreground">
-            <span className="text-sm font-bold">HireSphere Assistant</span>
+            <span className="flex items-center gap-1.5 text-sm font-bold">
+              HireSphere Assistant
+              <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide">
+                BETA
+              </span>
+            </span>
             <button onClick={() => setOpen(false)} aria-label="Close chat">
               <X className="size-4" />
             </button>
+          </div>
+          <div className="border-b bg-accent/10 px-3 py-1.5 text-[11px] font-semibold text-accent">
+            Beta — can get things wrong. Please double-check anything important.
           </div>
           <div ref={listRef} className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">
             {messages.length === 0 && (
@@ -98,7 +106,12 @@ export function ChatWidget() {
           </div>
         </div>
       )}
-      <Button size="icon-lg" className="rounded-full shadow-lg" onClick={() => setOpen((v) => !v)}>
+      <Button
+        size="icon-lg"
+        className="rounded-full shadow-lg"
+        data-tour="chat-bubble"
+        onClick={() => setOpen((v) => !v)}
+      >
         <MessageCircle className="size-5" />
       </Button>
     </div>
