@@ -19,7 +19,30 @@ const ApiError = require('./lib/ApiError');
 
 const app = express();
 
-app.use(cors());
+// Restricted to the real frontend origins — FRONTEND_URL is the same env var
+// already used to build links in outgoing emails, kept as the source of
+// truth here too. The literal Vercel URL is also listed directly as a
+// fallback in case that env var is ever unset/mistyped on the host. Local
+// dev origins are always allowed since there's nothing sensitive to protect
+// there. No Origin header at all (server-to-server calls, curl, health
+// checks) is allowed through, since CORS only ever matters to browsers.
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://hiresphere-university.vercel.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
+  })
+);
 app.use(express.json());
 
 app.get('/health', (req, res) => {
