@@ -292,6 +292,9 @@ export default function HomePage() {
             © {new Date().getFullYear()} HireSphere. Built for Placement Cells — by Durgesh
             Khushlani
           </span>
+          <Link href="/privacy" className="font-semibold transition-colors hover:text-primary">
+            Privacy Policy
+          </Link>
           <div className="flex items-center gap-2.5">
             <a
               href="https://www.linkedin.com/in/durgesh-khushlani-912366324/"
