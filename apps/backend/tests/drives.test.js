@@ -84,9 +84,36 @@ describe('GET /api/drives', () => {
     assert.equal(afterDeclare.body[0].results.length, 1);
     assert.equal(afterDeclare.body[0].results[0].name, 'Test Student');
   });
+
+  test('hides DRAFT drives from a student, but an admin still sees them', async () => {
+    const { admin, student, university, company } = await seedScenario();
+    await createDrive(university.id, company.id, { status: 'DRAFT' });
+
+    const studentRes = await api().get('/api/drives').set(...auth(student.token));
+    assert.equal(studentRes.body.length, 1);
+    assert.equal(studentRes.body[0].status, 'OPEN');
+
+    const adminRes = await api().get('/api/drives').set(...auth(admin.token));
+    assert.equal(adminRes.body.length, 2);
+  });
+
+  test('404s a student fetching a DRAFT drive directly by id', async () => {
+    const { admin, student, university, company } = await seedScenario();
+    const draft = await createDrive(university.id, company.id, { status: 'DRAFT' });
+
+    const studentRes = await api().get(`/api/drives/${draft.id}`).set(...auth(student.token));
+    assert.equal(studentRes.status, 404);
+
+    const adminRes = await api().get(`/api/drives/${draft.id}`).set(...auth(admin.token));
+    assert.equal(adminRes.status, 200);
+  });
 });
 
 describe('POST /api/drives', () => {
+  const oneRole = [
+    { title: 'SDE Intern', offerType: 'INTERNSHIP', description: 'Build things', stipendAmount: 25000 },
+  ];
+
   test('lets an admin create a drive, defaulting to DRAFT', async () => {
     const university = await createUniversity();
     const company = await createCompany();
@@ -95,11 +122,13 @@ describe('POST /api/drives', () => {
     const res = await api()
       .post('/api/drives')
       .set(...auth(admin.token))
-      .send({ companyId: company.id, title: 'SDE Intern' });
+      .send({ companyId: company.id, title: 'SDE Intern', roles: oneRole });
 
     assert.equal(res.status, 201);
     assert.equal(res.body.status, 'DRAFT');
     assert.equal(res.body.universityId, university.id);
+    assert.equal(res.body.roles.length, 1);
+    assert.equal(res.body.roles[0].title, 'SDE Intern');
   });
 
   test('forbids a student from creating a drive', async () => {
@@ -108,7 +137,7 @@ describe('POST /api/drives', () => {
     const res = await api()
       .post('/api/drives')
       .set(...auth(student.token))
-      .send({ companyId: company.id, title: 'Nope' });
+      .send({ companyId: company.id, title: 'Nope', roles: oneRole });
 
     assert.equal(res.status, 403);
   });
@@ -119,7 +148,7 @@ describe('POST /api/drives', () => {
     const res = await api()
       .post('/api/drives')
       .set(...auth(admin.token))
-      .send({ title: 'No company' });
+      .send({ title: 'No company', roles: oneRole });
 
     assert.equal(res.status, 400);
   });
@@ -130,7 +159,11 @@ describe('POST /api/drives', () => {
     const res = await api()
       .post('/api/drives')
       .set(...auth(admin.token))
-      .send({ companyId: '00000000-0000-0000-0000-000000000000', title: 'Ghost' });
+      .send({
+        companyId: '00000000-0000-0000-0000-000000000000',
+        title: 'Ghost',
+        roles: oneRole,
+      });
 
     assert.equal(res.status, 400);
   });
@@ -141,7 +174,44 @@ describe('POST /api/drives', () => {
     const res = await api()
       .post('/api/drives')
       .set(...auth(admin.token))
-      .send({ companyId: company.id, title: 'Bad', maxBacklogs: -1 });
+      .send({ companyId: company.id, title: 'Bad', maxBacklogs: -1, roles: oneRole });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects creating a drive with no roles', async () => {
+    const { admin, company } = await seedScenario();
+
+    const res = await api()
+      .post('/api/drives')
+      .set(...auth(admin.token))
+      .send({ companyId: company.id, title: 'Roleless' });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects creating a drive with an empty roles array', async () => {
+    const { admin, company } = await seedScenario();
+
+    const res = await api()
+      .post('/api/drives')
+      .set(...auth(admin.token))
+      .send({ companyId: company.id, title: 'Roleless', roles: [] });
+
+    assert.equal(res.status, 400);
+  });
+
+  test('rejects a role missing required fields', async () => {
+    const { admin, company } = await seedScenario();
+
+    const res = await api()
+      .post('/api/drives')
+      .set(...auth(admin.token))
+      .send({
+        companyId: company.id,
+        title: 'Bad role',
+        roles: [{ title: 'SDE', offerType: 'JOB' }],
+      });
 
     assert.equal(res.status, 400);
   });

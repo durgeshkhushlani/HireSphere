@@ -72,8 +72,11 @@ export type DriveWithAccessReveal = Drive & { companyAccess: CompanyAccessReveal
 export type ApplicationFormQuestion = { id: string; label: string; type?: string };
 export type ApplicationForm = { id: string; driveId: string; questions: ApplicationFormQuestion[] };
 
-export function listDrives(token: string) {
-  return apiFetch<Drive[]>("/drives", { token });
+// academicYear (e.g. "2026-27") filters to drives created within that
+// placement season — omit to get every drive regardless of season.
+export function listDrives(token: string, academicYear?: string) {
+  const query = academicYear ? `?academicYear=${encodeURIComponent(academicYear)}` : "";
+  return apiFetch<Drive[]>(`/drives${query}`, { token });
 }
 
 export function getDrive(driveId: string, token: string) {
@@ -106,6 +109,7 @@ export function createDrive(
     description?: string;
     minCgpa?: number;
     maxBacklogs?: number;
+    roles: DriveRoleInput[];
   },
   token: string
 ) {

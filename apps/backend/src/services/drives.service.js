@@ -3,6 +3,7 @@ const ApiError = require('../lib/ApiError');
 const notificationsService = require('./notifications.service');
 const companyPortalService = require('./company-portal.service');
 const mailer = require('../lib/mailer');
+const { academicYearBounds } = require('../lib/academicYear');
 
 const DRIVE_STATUSES = ['DRAFT', 'OPEN', 'CLOSED'];
 
@@ -16,9 +17,23 @@ async function requireScoped(driveId, universityId) {
 
 const ROLES_ORDER = { orderBy: { createdAt: 'asc' } };
 
-async function listForUniversity(universityId) {
+// DRAFT drives are still being set up by the admin (no roles finalized, no
+// eligibility set) — students never see them, only once opened to at least
+// OPEN/CLOSED. Admins always see every status, since they're the ones
+// managing drafts.
+//
+// academicYear (e.g. "2026-27") is an optional filter on when the drive was
+// created — a placement season, not a stored field (see lib/academicYear.js).
+// A malformed/unrecognized label is treated as "no filter" rather than an
+// error, so a bad query param degrades gracefully instead of 500ing.
+async function listForUniversity(universityId, role, academicYear) {
+  const bounds = academicYear ? academicYearBounds(academicYear) : null;
   const drives = await prisma.drive.findMany({
-    where: { universityId },
+    where: {
+      universityId,
+      ...(role === 'STUDENT' && { status: { not: 'DRAFT' } }),
+      ...(bounds && { createdAt: { gte: bounds.start, lt: bounds.end } }),
+    },
     include: { company: true, roles: ROLES_ORDER },
     orderBy: { createdAt: 'desc' },
   });
@@ -41,12 +56,14 @@ async function getResults(driveId) {
   }));
 }
 
-async function getForUniversity(driveId, universityId) {
+async function getForUniversity(driveId, universityId, role) {
   const drive = await prisma.drive.findFirst({
     where: { id: driveId, universityId },
     include: { company: true, eligiblePrograms: true, roles: ROLES_ORDER },
   });
-  if (!drive) throw ApiError.notFound('Drive not found');
+  if (!drive || (role === 'STUDENT' && drive.status === 'DRAFT')) {
+    throw ApiError.notFound('Drive not found');
+  }
   if (!drive.resultsDeclared) return drive;
   return { ...drive, results: await getResults(drive.id) };
 }
@@ -66,26 +83,49 @@ async function searchDrives(universityId, { companyQuery, driveId } = {}) {
   });
 }
 
-async function create({ companyId, title, description, minCgpa, maxBacklogs }, universityId) {
+// At least one role is required at creation — a drive nobody can actually
+// apply for a specific position under is useless, and previously roles
+// could be left empty indefinitely since they were only ever addable later
+// through a separate editor.
+async function create({ companyId, title, description, minCgpa, maxBacklogs, roles }, universityId) {
   if (!companyId || !title) {
     throw ApiError.badRequest('companyId and title are required');
   }
   if (maxBacklogs !== undefined && maxBacklogs !== null && maxBacklogs < 0) {
     throw ApiError.badRequest('maxBacklogs cannot be negative');
   }
+  if (!Array.isArray(roles) || roles.length === 0) {
+    throw ApiError.badRequest('At least one role is required to create a drive');
+  }
+  roles.forEach(validateRole);
 
   let drive;
   try {
-    drive = await prisma.drive.create({
-      data: {
-        companyId,
-        title,
-        description,
-        universityId,
-        ...(minCgpa !== undefined && { minCgpa }),
-        ...(maxBacklogs !== undefined && { maxBacklogs }),
-      },
-      include: { company: true, university: true },
+    drive = await prisma.$transaction(async (tx) => {
+      const created = await tx.drive.create({
+        data: {
+          companyId,
+          title,
+          description,
+          universityId,
+          ...(minCgpa !== undefined && { minCgpa }),
+          ...(maxBacklogs !== undefined && { maxBacklogs }),
+        },
+      });
+      await tx.driveRole.createMany({
+        data: roles.map((role) => ({
+          driveId: created.id,
+          title: role.title.trim(),
+          offerType: role.offerType,
+          description: role.description.trim(),
+          ctcAmount: role.offerType === 'JOB' ? role.ctcAmount : null,
+          stipendAmount: role.offerType === 'INTERNSHIP' ? role.stipendAmount : null,
+        })),
+      });
+      return tx.drive.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { company: true, university: true, roles: ROLES_ORDER },
+      });
     });
   } catch (err) {
     if (err.code === 'P2003') throw ApiError.badRequest('companyId does not exist');

@@ -10,7 +10,12 @@ const createDriveViaApi = (companyId, token, overrides = {}) =>
   api()
     .post('/api/drives')
     .set(...auth(token))
-    .send({ companyId, title: 'Portal Test Drive', ...overrides });
+    .send({
+      companyId,
+      title: 'Portal Test Drive',
+      roles: [{ title: 'SWE', offerType: 'JOB', description: 'Build things', ctcAmount: 1000000 }],
+      ...overrides,
+    });
 
 const login = (body) => api().post('/api/company-portal/login').send(body);
 
@@ -87,7 +92,7 @@ describe('company-portal scoped access', () => {
     const applied = await api()
       .post(`/api/drives/${driveId}/applications`)
       .set(...auth(student.token))
-      .send({ responses: {} });
+      .send({ responses: {}, rolePreferences: [created.body.roles[0].id] });
 
     const loginRes = await login({
       universityDomain: university.domain,

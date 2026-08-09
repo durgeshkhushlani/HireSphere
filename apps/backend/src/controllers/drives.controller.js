@@ -2,11 +2,17 @@ const drivesService = require('../services/drives.service');
 const companyPortalService = require('../services/company-portal.service');
 
 async function list(req, res) {
-  res.json(await drivesService.listForUniversity(req.user.universityId));
+  res.json(
+    await drivesService.listForUniversity(req.user.universityId, req.user.role, req.query.academicYear)
+  );
 }
 
 async function getById(req, res) {
-  const drive = await drivesService.getForUniversity(req.params.id, req.user.universityId);
+  const drive = await drivesService.getForUniversity(
+    req.params.id,
+    req.user.universityId,
+    req.user.role
+  );
   // The access code (not the password/hash) is only meaningful to an admin
   // building/sharing the company-portal link — never sent to a student or
   // to the company caller viewing their own drive.

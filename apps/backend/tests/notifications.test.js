@@ -117,7 +117,11 @@ describe('notification triggers', () => {
     const res = await api()
       .post('/api/drives')
       .set(...auth(admin.token))
-      .send({ companyId: company.id, title: 'SDE Hiring' });
+      .send({
+        companyId: company.id,
+        title: 'SDE Hiring',
+        roles: [{ title: 'SDE', offerType: 'JOB', description: 'Build things', ctcAmount: 1000000 }],
+      });
 
     assert.equal(res.status, 201);
     const message = mailer.getLastTestMessage();

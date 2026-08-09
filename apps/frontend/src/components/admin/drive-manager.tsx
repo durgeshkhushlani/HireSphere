@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { listDrives, updateDriveStatus, type Drive } from "@/lib/api/drives";
 import { driveStatusStyle, type DriveStatus } from "@/lib/status";
+import { useAcademicYear } from "@/lib/academic-year-context";
 import { CreateDriveDialog } from "./create-drive-dialog";
 import { SearchInput } from "@/components/ui/search-input";
 
@@ -33,6 +34,7 @@ const STATUS_OPTIONS: DriveStatus[] = ["DRAFT", "OPEN", "CLOSED"];
 
 export function DriveManager() {
   const { token } = useAuth();
+  const { selectedYear } = useAcademicYear();
   const [drives, setDrives] = useState<Drive[] | null>(null);
   const [query, setQuery] = useState("");
   const [pendingChange, setPendingChange] = useState<{ drive: Drive; status: DriveStatus } | null>(
@@ -43,11 +45,11 @@ export function DriveManager() {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      setDrives(await listDrives(token));
+      setDrives(await listDrives(token, selectedYear));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Couldn't load drives");
     }
-  }, [token]);
+  }, [token, selectedYear]);
 
   useEffect(() => {
     refresh();
@@ -90,7 +92,8 @@ export function DriveManager() {
         </div>
       ) : drives.length === 0 ? (
         <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-          No drives yet — create your first one to get started.
+          No drives in {selectedYear} — switch seasons above, or create your first one for this
+          season to get started.
         </p>
       ) : filtered.length === 0 ? (
         <p className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
