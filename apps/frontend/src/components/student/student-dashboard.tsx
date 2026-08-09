@@ -11,6 +11,7 @@ import { listMyPlacements, type MyPlacement } from "@/lib/api/placements";
 import { DriveBrowser } from "./drive-browser";
 import { MyApplications } from "./my-applications";
 import { PlacementBanner } from "./placement-banner";
+import { getCurrentAcademicYear } from "@/lib/academic-year";
 
 const TAB_TRIGGER_CLASS =
   "rounded-full border border-border bg-card px-4 shadow-sm data-active:border-transparent data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-foreground dark:data-active:text-background dark:data-active:hover:text-background";
@@ -25,7 +26,7 @@ export function StudentDashboard() {
     if (!token) return;
     try {
       const [driveList, applicationList, placementList] = await Promise.all([
-        listDrives(token),
+        listDrives(token, getCurrentAcademicYear()),
         listMyApplications(token),
         listMyPlacements(token),
       ]);
@@ -47,7 +48,15 @@ export function StudentDashboard() {
     <div className="mx-auto max-w-5xl px-6 py-8 sm:px-8">
       {placements.length > 0 && <PlacementBanner placement={placements[0]} />}
 
-      <h1 className="font-heading text-2xl font-extrabold">Drives</h1>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h1 className="font-heading text-2xl font-extrabold">Drives</h1>
+        <span
+          data-tour="academic-year"
+          className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary"
+        >
+          Academic Year {getCurrentAcademicYear()}
+        </span>
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Browse open drives at your university and track every application you submit.
       </p>
@@ -55,8 +64,8 @@ export function StudentDashboard() {
       <Tabs defaultValue="drives" className="mt-6">
         <div className="-mx-6 overflow-x-auto overflow-y-hidden px-6 sm:mx-0 sm:px-0">
           <TabsList className="w-max gap-2 bg-transparent p-0">
-            <TabsTrigger value="drives" className={TAB_TRIGGER_CLASS}>Browse Drives</TabsTrigger>
-            <TabsTrigger value="applications" className={TAB_TRIGGER_CLASS}>
+            <TabsTrigger value="drives" data-tour="tab-browse-drives" className={TAB_TRIGGER_CLASS}>Browse Drives</TabsTrigger>
+            <TabsTrigger value="applications" data-tour="tab-my-applications" className={TAB_TRIGGER_CLASS}>
               My Applications{applications ? ` (${applications.length})` : ""}
             </TabsTrigger>
           </TabsList>
