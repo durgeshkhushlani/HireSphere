@@ -384,6 +384,15 @@ async function startDemo() {
     });
 
     return { admin, students: { aarav, diya, rohan, sneha, kabir }, expiresAt };
+  }, {
+    // ~30 sequential round trips (university, programs, admin, 5 students
+    // with profiles, drives, roles, forms, applications, a placement) run
+    // near-instantly against a local DB, but Prisma's default 5s interactive-
+    // transaction timeout can be too tight against a real remote database's
+    // network latency — raised well above worst-case, not just the observed
+    // failure, so a slow moment doesn't reintroduce this intermittently.
+    timeout: 30000,
+    maxWait: 10000,
   });
 
   return {

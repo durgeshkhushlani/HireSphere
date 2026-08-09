@@ -115,7 +115,7 @@ describe('POST /api/demo/start', () => {
   });
 
   test('rate-limits repeated starts from the same caller', async () => {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
       const res = await startDemo();
       assert.equal(res.status, 201);
     }

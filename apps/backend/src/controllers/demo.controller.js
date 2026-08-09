@@ -5,7 +5,7 @@ const demoService = require('../services/demo.service');
 // good enough for a single-process deploy, and demo-abuse only needs to be
 // throttled, not perfectly enforced across a fleet.
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const RATE_LIMIT_MAX_STARTS = 5;
+const RATE_LIMIT_MAX_STARTS = 20;
 const startTimestamps = new Map();
 
 function checkRateLimit(ip) {
