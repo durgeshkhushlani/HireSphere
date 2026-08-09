@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Drive } from "@/lib/api/drives";
+import { getEligiblePrograms, type Drive } from "@/lib/api/drives";
 import { useUniversityTimezone } from "@/lib/use-university-timezone";
 import { formatInZone } from "@/lib/timezone";
+import { useAuth } from "@/lib/auth-context";
 
 function formatAmount(amount: string | null, suffix: string) {
   if (amount == null) return null;
@@ -27,12 +28,25 @@ function formatAmount(amount: string | null, suffix: string) {
 }
 
 export function DriveDetailsDialog({ drive }: { drive: Drive }) {
+  const { token } = useAuth();
   const timezone = useUniversityTimezone();
   const [selectedRoleId, setSelectedRoleId] = useState(drive.roles[0]?.id ?? "");
   const selectedRole = drive.roles.find((r) => r.id === selectedRoleId) ?? drive.roles[0];
+  const [eligiblePrograms, setEligiblePrograms] = useState<{ id: string; name: string }[] | null>(
+    null
+  );
+
+  async function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen || !token || eligiblePrograms !== null) return;
+    try {
+      setEligiblePrograms(await getEligiblePrograms(drive.id, token));
+    } catch {
+      // Non-critical — the details dialog still works without this.
+    }
+  }
 
   return (
-    <Dialog>
+    <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>Details</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -61,6 +75,17 @@ export function DriveDetailsDialog({ drive }: { drive: Drive }) {
               </div>
             </div>
           )}
+
+          <div>
+            <div className="text-xs font-semibold text-muted-foreground">Open to</div>
+            <div className="text-sm">
+              {eligiblePrograms === null
+                ? "Loading…"
+                : eligiblePrograms.length === 0
+                  ? "All programs"
+                  : eligiblePrograms.map((p) => p.name).join(", ")}
+            </div>
+          </div>
 
           {drive.roles.length === 0 ? (
             <p className="text-sm text-muted-foreground">No roles have been added yet.</p>

@@ -1,17 +1,25 @@
 const prisma = require('../lib/prisma');
+const { academicYearBounds } = require('../lib/academicYear');
 
 const PLACEMENT_INCLUDE = {
   company: true,
   drive: { select: { id: true, title: true } },
+  driveRole: { select: { id: true, title: true, offerType: true } },
 };
 
 // user.placementLocked is flattened out of the studentProfile relation here
 // so callers don't need to know about that join — it's the same "is this
 // student currently locked out of further applications" flag shown/toggled
 // on the placements-overview admin screen.
-async function listForUniversity(universityId) {
+//
+// academicYear (e.g. "2026-27") is an optional filter on placedAt — a
+// placement belongs to the season the offer actually happened in, not
+// necessarily the season its drive was created in. A malformed/unrecognized
+// label is treated as "no filter" rather than an error.
+async function listForUniversity(universityId, academicYear) {
+  const bounds = academicYear ? academicYearBounds(academicYear) : null;
   const placements = await prisma.placement.findMany({
-    where: { universityId },
+    where: { universityId, ...(bounds && { placedAt: { gte: bounds.start, lt: bounds.end } }) },
     include: {
       ...PLACEMENT_INCLUDE,
       user: {
