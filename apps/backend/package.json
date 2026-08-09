@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --exec tsx src/server.js",
     "start": "tsx src/server.js",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && prisma migrate deploy",
     "test": "node --import tsx --test --test-concurrency=1 \"tests/**/*.test.js\"",
     "test:watch": "node --import tsx --test --test-concurrency=1 --watch \"tests/**/*.test.js\"",
     "test:migrate": "prisma migrate deploy"
