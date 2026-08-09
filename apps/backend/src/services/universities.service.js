@@ -1,5 +1,12 @@
 const prisma = require('../lib/prisma');
 const ApiError = require('../lib/ApiError');
+const mailer = require('../lib/mailer');
+
+// Same fixed recipient as bug-reports.service.js/adoption-requests.service.js
+// — there's no platform-operator role/dashboard yet, so a direct email is
+// how the person doing manual verification actually finds out a new
+// registration is waiting on them.
+const VERIFICATION_RECIPIENT = 'durgeshkhushlani@gmail.com';
 
 // Only verified universities are publicly discoverable — this list backs
 // pre-registration dropdowns, and an unverified entry isn't real yet.
@@ -44,14 +51,37 @@ async function create({ name, domain, contactName, contactEmail }) {
     throw ApiError.badRequest('Contact email must be at the same domain you are registering');
   }
 
+  let university;
   try {
-    return await prisma.university.create({ data: { name, domain, contactName, contactEmail } });
+    university = await prisma.university.create({ data: { name, domain, contactName, contactEmail } });
   } catch (err) {
     if (err.code === 'P2002') {
       throw ApiError.conflict('A university with this domain already exists');
     }
     throw err;
   }
+
+  // Best-effort — a failed notification shouldn't fail the registration
+  // itself, same reasoning as every other notify-on-event call in this
+  // codebase (see companies.service.js, drives.service.js).
+  try {
+    await mailer.sendMail({
+      to: VERIFICATION_RECIPIENT,
+      subject: `[HireSphere] New university registration: ${name}`,
+      text: [
+        'A new university registration is waiting on manual verification.',
+        '',
+        `Name: ${name}`,
+        `Domain: ${domain}`,
+        `Contact name: ${contactName}`,
+        `Contact email: ${contactEmail}`,
+      ].join('\n'),
+    });
+  } catch (err) {
+    console.error('Failed to send university-registration notification:', err);
+  }
+
+  return university;
 }
 
 async function listPrograms(universityId) {

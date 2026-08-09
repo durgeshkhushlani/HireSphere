@@ -4,21 +4,21 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CheckCircle2, ShieldCheck, Video } from "lucide-react";
+import { CheckCircle2, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/client";
 import { createUniversity } from "@/lib/api/universities";
 
-type VerificationMethod = "video" | "dns";
+type VerificationMethod = "manual" | "dns";
 
 export function RegisterUniversityFlow() {
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [method, setMethod] = useState<VerificationMethod>("video");
+  const [method, setMethod] = useState<VerificationMethod>("manual");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -55,10 +55,10 @@ export function RegisterUniversityFlow() {
             Request received
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Thanks, {contactName.trim().split(" ")[0]} — someone from our team will reach out to{" "}
-            <span className="font-semibold text-foreground">{contactEmail}</span> to schedule a
-            quick verification video call. Once {name} is verified, come back and sign up as an
-            admin using your university email.
+            Thanks, {contactName.trim().split(" ")[0]} — we&apos;ll contact{" "}
+            <span className="font-semibold text-foreground">{contactEmail}</span> by email for
+            the verification process (this may include a quick video call). Once {name} is
+            verified, come back and sign up as an admin using your university email.
           </p>
           <Button className="mt-8" nativeButton={false} render={<Link href="/" />}>
             Back to home
@@ -138,16 +138,16 @@ export function RegisterUniversityFlow() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setMethod("video")}
-                aria-pressed={method === "video"}
+                onClick={() => setMethod("manual")}
+                aria-pressed={method === "manual"}
                 className={`rounded-xl border p-4 text-left transition-colors ${
-                  method === "video" ? "border-primary bg-primary/5" : "border-border"
+                  method === "manual" ? "border-primary bg-primary/5" : "border-border"
                 }`}
               >
-                <Video className="size-4 text-primary" />
-                <div className="mt-2 text-sm font-bold">Video call</div>
+                <Mail className="size-4 text-primary" />
+                <div className="mt-2 text-sm font-bold">Manual verification</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  A quick call to confirm you represent the university
+                  We&apos;ll contact you by email — this may include a quick video call
                 </div>
               </button>
 

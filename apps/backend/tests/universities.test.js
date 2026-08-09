@@ -5,6 +5,7 @@ const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { resetDb, disconnect } = require('./helpers/db');
 const { api, auth, createUniversity, createProgram, registerAdmin, registerStudent } = require('./helpers/factories');
+const mailer = require('../src/lib/mailer');
 
 beforeEach(resetDb);
 after(disconnect);
@@ -29,6 +30,18 @@ describe('POST /api/universities', () => {
     assert.equal(res.body.verified, false);
     assert.equal(res.body.contactName, 'Placement Cell');
     assert.equal(res.body.contactEmail, payload.contactEmail);
+  });
+
+  test('emails the platform owner so the registration can be manually verified', async () => {
+    const payload = validPayload();
+    const res = await api().post('/api/universities').send(payload);
+
+    assert.equal(res.status, 201);
+    const message = mailer.getLastTestMessage();
+    assert.equal(message.to[0].address, 'durgeshkhushlani@gmail.com');
+    assert.match(message.subject, new RegExp(payload.name));
+    assert.match(message.text, new RegExp(payload.domain));
+    assert.match(message.text, /Placement Cell/);
   });
 
   for (const missing of ['name', 'domain', 'contactName', 'contactEmail']) {
