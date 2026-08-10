@@ -87,12 +87,23 @@ async function searchDrives(universityId, { companyQuery, driveId } = {}) {
 // apply for a specific position under is useless, and previously roles
 // could be left empty indefinitely since they were only ever addable later
 // through a separate editor.
-async function create({ companyId, title, description, minCgpa, maxBacklogs, roles }, universityId) {
+// Only DRAFT or OPEN are meaningful at creation — a brand-new drive can't
+// already be CLOSED (nothing was ever open to close), so that's rejected
+// here rather than reusing the full DRIVE_STATUSES list updateStatus() allows.
+const CREATABLE_STATUSES = ['DRAFT', 'OPEN'];
+
+async function create(
+  { companyId, title, description, minCgpa, maxBacklogs, roles, status },
+  universityId
+) {
   if (!companyId || !title) {
     throw ApiError.badRequest('companyId and title are required');
   }
   if (maxBacklogs !== undefined && maxBacklogs !== null && maxBacklogs < 0) {
     throw ApiError.badRequest('maxBacklogs cannot be negative');
+  }
+  if (status !== undefined && !CREATABLE_STATUSES.includes(status)) {
+    throw ApiError.badRequest(`status must be one of: ${CREATABLE_STATUSES.join(', ')}`);
   }
   if (!Array.isArray(roles) || roles.length === 0) {
     throw ApiError.badRequest('At least one role is required to create a drive');
@@ -108,6 +119,7 @@ async function create({ companyId, title, description, minCgpa, maxBacklogs, rol
           title,
           description,
           universityId,
+          ...(status !== undefined && { status, ...(status === 'OPEN' && { openedAt: new Date() }) }),
           ...(minCgpa !== undefined && { minCgpa }),
           ...(maxBacklogs !== undefined && { maxBacklogs }),
         },

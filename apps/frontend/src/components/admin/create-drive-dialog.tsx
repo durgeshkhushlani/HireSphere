@@ -63,6 +63,7 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
   const [companyId, setCompanyId] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
   const [title, setTitle] = useState("");
+  const [status, setStatus] = useState<"DRAFT" | "OPEN">("DRAFT");
   const [description, setDescription] = useState("");
   const [minCgpa, setMinCgpa] = useState("");
   const [maxBacklogs, setMaxBacklogs] = useState("");
@@ -80,6 +81,7 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
     setCompanyId("");
     setNewCompanyName("");
     setTitle("");
+    setStatus("DRAFT");
     setDescription("");
     setMinCgpa("");
     setMaxBacklogs("");
@@ -168,6 +170,7 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
         {
           companyId: resolvedCompanyId,
           title: title.trim(),
+          status,
           description: description.trim() || undefined,
           minCgpa: minCgpa ? Number(minCgpa) : undefined,
           maxBacklogs: maxBacklogs ? Number(maxBacklogs) : undefined,
@@ -205,7 +208,7 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
         <DialogHeader>
           <DialogTitle>Create a drive</DialogTitle>
           <DialogDescription>
-            Starts in Draft — open it once you&apos;re ready for applications.
+            Choose whether it&apos;s visible to students right away, or starts as a draft.
           </DialogDescription>
         </DialogHeader>
 
@@ -330,6 +333,37 @@ export function CreateDriveDialog({ onCreated }: { onCreated: () => void }) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="TechNova Systems — 2026 Hiring"
             />
+          </div>
+
+          <div>
+            <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
+              Starting status
+            </Label>
+            <div className="flex gap-2 rounded-lg bg-muted p-1">
+              <button
+                type="button"
+                onClick={() => setStatus("DRAFT")}
+                className={`flex-1 rounded-md py-1.5 text-sm font-bold ${
+                  status === "DRAFT" ? "bg-card shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus("OPEN")}
+                className={`flex-1 rounded-md py-1.5 text-sm font-bold ${
+                  status === "OPEN" ? "bg-card shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                Open
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {status === "DRAFT"
+                ? "Not visible to students yet — open it later when you're ready."
+                : "Immediately visible and accepting applications from eligible students."}
+            </p>
           </div>
 
           <div>

@@ -110,6 +110,8 @@ export function createDrive(
     minCgpa?: number;
     maxBacklogs?: number;
     roles: DriveRoleInput[];
+    // Only DRAFT or OPEN are valid at creation — omit for the default (DRAFT).
+    status?: "DRAFT" | "OPEN";
   },
   token: string
 ) {

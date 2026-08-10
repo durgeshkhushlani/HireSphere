@@ -131,6 +131,32 @@ describe('POST /api/drives', () => {
     assert.equal(res.body.roles[0].title, 'SDE Intern');
   });
 
+  test('lets an admin create a drive that starts OPEN, stamping openedAt', async () => {
+    const university = await createUniversity();
+    const company = await createCompany();
+    const admin = await registerAdmin(university.id);
+
+    const res = await api()
+      .post('/api/drives')
+      .set(...auth(admin.token))
+      .send({ companyId: company.id, title: 'Immediately open', status: 'OPEN', roles: oneRole });
+
+    assert.equal(res.status, 201);
+    assert.equal(res.body.status, 'OPEN');
+    assert.ok(res.body.openedAt);
+  });
+
+  test('rejects CLOSED as a creation status', async () => {
+    const { admin, company } = await seedScenario();
+
+    const res = await api()
+      .post('/api/drives')
+      .set(...auth(admin.token))
+      .send({ companyId: company.id, title: 'Nope', status: 'CLOSED', roles: oneRole });
+
+    assert.equal(res.status, 400);
+  });
+
   test('forbids a student from creating a drive', async () => {
     const { student, company } = await seedScenario();
 
