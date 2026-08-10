@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RequiredDot } from "@/components/ui/required-dot";
 import {
   Select,
   SelectContent,
@@ -200,25 +201,25 @@ export function StudentProfileDialog({
                 <>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                      Student ID <span className="text-destructive">*</span>
+                      Student ID <RequiredDot />
                     </Label>
                     <Input value={studentId} onChange={(e) => setStudentId(e.target.value)} />
                   </div>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                      10th % <span className="text-destructive">*</span>
+                      10th % <RequiredDot />
                     </Label>
                     <Input type="number" min={0} max={100} value={tenth} onChange={(e) => setTenth(e.target.value)} />
                   </div>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                      12th % <span className="text-destructive">*</span>
+                      12th % <RequiredDot />
                     </Label>
                     <Input type="number" min={0} max={100} value={twelfth} onChange={(e) => setTwelfth(e.target.value)} />
                   </div>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                      Blood group <span className="text-destructive">*</span>
+                      Blood group <RequiredDot />
                     </Label>
                     <Input value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} placeholder="O+" />
                   </div>
@@ -236,13 +237,13 @@ export function StudentProfileDialog({
                 <>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                      Address {!verified && <span className="text-destructive">*</span>}
+                      Address {!verified && <RequiredDot />}
                     </Label>
                     <Input value={address} onChange={(e) => setAddress(e.target.value)} />
                   </div>
                   <div>
                     <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                      Phone {!verified && <span className="text-destructive">*</span>}
+                      Phone {!verified && <RequiredDot />}
                     </Label>
                     <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </div>
@@ -265,7 +266,7 @@ export function StudentProfileDialog({
                         <>
                           <Label className="mb-1.5 text-xs font-semibold text-muted-foreground">
                             {f.label}
-                            {f.required && <span className="text-destructive"> *</span>}
+                            {f.required && <RequiredDot />}
                           </Label>
                           {f.fieldType === "DROPDOWN" ? (
                             <Select

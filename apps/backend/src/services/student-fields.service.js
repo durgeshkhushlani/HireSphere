@@ -10,7 +10,7 @@ function listForUniversity(universityId) {
   });
 }
 
-function create(universityId, { label, fieldType, required, options }) {
+async function create(universityId, { label, fieldType, required, options }) {
   if (!label || !label.trim()) {
     throw ApiError.badRequest('label is required');
   }
@@ -23,14 +23,30 @@ function create(universityId, { label, fieldType, required, options }) {
     }
   }
 
-  return prisma.studentCustomFieldDefinition.create({
-    data: {
-      universityId,
-      label: label.trim(),
-      fieldType,
-      required: Boolean(required),
-      options: fieldType === 'DROPDOWN' ? options : undefined,
-    },
+  return prisma.$transaction(async (tx) => {
+    const definition = await tx.studentCustomFieldDefinition.create({
+      data: {
+        universityId,
+        label: label.trim(),
+        fieldType,
+        required: Boolean(required),
+        options: fieldType === 'DROPDOWN' ? options : undefined,
+      },
+    });
+
+    // A new required field means every already-verified profile is now
+    // incomplete against it (nobody could have filled in a field that
+    // didn't exist yet) — send them back to unverified so an admin
+    // re-reviews once the student fills it in, same as any other required
+    // field being missing at verification time.
+    if (definition.required) {
+      await tx.studentProfile.updateMany({
+        where: { verified: true, user: { universityId } },
+        data: { verified: false },
+      });
+    }
+
+    return definition;
   });
 }
 

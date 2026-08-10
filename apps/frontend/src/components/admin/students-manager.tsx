@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RequiredDot } from "@/components/ui/required-dot";
 import {
   Select,
   SelectContent,
@@ -146,7 +147,14 @@ function FieldDefinitionsManager() {
           <label className="flex items-center gap-1.5 pb-2 text-sm font-semibold">
             <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
             Required
+            <RequiredDot />
           </label>
+          {required && (
+            <p className="w-full text-xs text-muted-foreground">
+              Marking this required will send every existing student&apos;s profile back to
+              unverified until they fill it in.
+            </p>
+          )}
           <Button onClick={handleAdd} disabled={submitting}>
             <Plus /> Add field
           </Button>
@@ -166,7 +174,12 @@ function FieldDefinitionsManager() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="font-semibold">{d.label}</span>
                 <span className="text-xs text-muted-foreground">{FIELD_TYPE_LABELS[d.fieldType]}</span>
-                {d.required && <Badge variant="outline">Required</Badge>}
+                {d.required && (
+                  <Badge variant="outline">
+                    Required
+                    <RequiredDot />
+                  </Badge>
+                )}
                 {d.fieldType === "DROPDOWN" && d.options && (
                   <span className="text-xs text-muted-foreground">({d.options.join(", ")})</span>
                 )}

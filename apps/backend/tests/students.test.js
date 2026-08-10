@@ -231,6 +231,43 @@ describe('Custom field definitions', () => {
     const profile = await api().get('/api/students/me').set(...auth(student.token));
     assert.deepEqual(profile.body.customFields, []);
   });
+
+  test('adding a new required field sends already-verified students back to unverified', async () => {
+    const { admin, student } = await seed();
+    await fillFixedFields(student.token);
+    await api()
+      .patch(`/api/students/${student.user.id}/verify`)
+      .set(...auth(admin.token))
+      .send({ verified: true });
+
+    const before = await api().get('/api/students/me').set(...auth(student.token));
+    assert.equal(before.body.verified, true);
+
+    await api()
+      .post('/api/students/field-definitions')
+      .set(...auth(admin.token))
+      .send({ label: 'Hostel name', fieldType: 'TEXT', required: true });
+
+    const after = await api().get('/api/students/me').set(...auth(student.token));
+    assert.equal(after.body.verified, false);
+  });
+
+  test('adding a new optional field does not touch verification', async () => {
+    const { admin, student } = await seed();
+    await fillFixedFields(student.token);
+    await api()
+      .patch(`/api/students/${student.user.id}/verify`)
+      .set(...auth(admin.token))
+      .send({ verified: true });
+
+    await api()
+      .post('/api/students/field-definitions')
+      .set(...auth(admin.token))
+      .send({ label: 'Nickname', fieldType: 'TEXT', required: false });
+
+    const after = await api().get('/api/students/me').set(...auth(student.token));
+    assert.equal(after.body.verified, true);
+  });
 });
 
 describe('GET /api/students', () => {

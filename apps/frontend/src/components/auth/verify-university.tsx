@@ -66,7 +66,7 @@ export function VerifyUniversityCheck() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mt-2 text-xs font-bold text-primary"
+          className="mt-2 text-xs font-bold text-primary underline underline-offset-4"
         >
           Check if your university is verified
         </button>
