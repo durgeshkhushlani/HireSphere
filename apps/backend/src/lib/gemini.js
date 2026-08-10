@@ -34,6 +34,14 @@ async function chatCompletion(messages, tools) {
     return { role: 'assistant', content: 'This is a test response from the fake Gemini client.' };
   }
 
+  if (API_KEYS.length === 0) {
+    // Without this, the retry loop below never runs (API_KEYS.length is the
+    // loop bound), lastErr stays undefined, and `throw lastErr` throws
+    // undefined — console.error(undefined) then logs nothing useful,
+    // turning a one-line config fix into a real debugging session.
+    throw new Error('No Gemini API key configured — set GEMINI_KEY_1 (and optionally GEMINI_KEY_2)');
+  }
+
   const body = {
     model: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
     messages,
